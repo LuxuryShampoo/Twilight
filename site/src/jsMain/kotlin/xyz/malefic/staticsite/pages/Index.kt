@@ -459,10 +459,12 @@ fun HomePage() {
 
                     Box(
                         Modifier
+                            .width(100.percent)
                             .backgroundColor(Colors.White)
                             .border(1.px, LineStyle.Solid, Color("#f0f0f0"))
                             .minHeight(40.px)
                             .position(Position.Relative)
+                            .id("cell-$dayOffset-$hour")
                             .styleModifier {
                                 property("grid-column", "${dayOffset + 2}")
                                 property("grid-row", "${hour + 3}")
