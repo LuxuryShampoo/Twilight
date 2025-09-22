@@ -125,7 +125,41 @@ fun HomePage() {
             "5 AM",
         )
 
-    Column(Modifier.fillMaxSize().padding(16.px)) {
+    Column(
+        Modifier
+            .fillMaxSize()
+            .backgroundColor(
+                org.jetbrains.compose.web.css
+                    .Color(ThemeManager.Colors.background),
+            ).padding(16.px),
+    ) {
+        // Top bar with dark mode toggle
+        Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.TopEnd) {
+            Button(
+                attrs = {
+                    onClick { ThemeManager.toggleDarkMode() }
+                    style {
+                        padding(8.px, 16.px)
+                        backgroundColor(
+                            org.jetbrains.compose.web.css
+                                .Color(if (ThemeManager.isDarkMode) "#222" else "#eee"),
+                        )
+                        color(
+                            org.jetbrains.compose.web.css
+                                .Color(if (ThemeManager.isDarkMode) "#fff" else "#222"),
+                        )
+                        border(0.px)
+                        borderRadius(6.px)
+                        fontSize(14.px)
+                        fontWeight(600)
+                        cursor(Cursor.Pointer)
+                    }
+                },
+            ) {
+                Text(if (ThemeManager.isDarkMode) "☀️ Light Mode" else "🌙 Dark Mode")
+            }
+        }
+
         // Calendar Title
         Box(
             Modifier

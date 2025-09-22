@@ -13,8 +13,6 @@ import com.varabyte.kobweb.silk.style.base
 import com.varabyte.kobweb.silk.style.selectors.hover
 import com.varabyte.kobweb.silk.style.toModifier
 import kotlinx.browser.document
-import kotlinx.browser.window
-import kotlinx.coroutines.launch
 import org.jetbrains.compose.web.css.*
 import org.jetbrains.compose.web.dom.*
 import org.w3c.dom.HTMLElement
@@ -24,10 +22,11 @@ import xyz.malefic.staticsite.util.*
 import kotlin.js.Date
 import kotlin.math.max
 import kotlin.math.min
+import kotlin.math.sqrt
 import com.varabyte.kobweb.compose.ui.graphics.Color as Kolor
 
 // Shared drag state so other events can disable pointer-events while dragging
-object DragState {
+object GlobalDragState {
     var draggingId by mutableStateOf<String?>(null)
 }
 
@@ -99,18 +98,19 @@ val CalendarEventStyle =
         Modifier
             .backgroundColor(Color("#3b82f6"))
             .color(Colors.White)
-            .borderRadius(4.px)
+            .borderRadius(0.px) // Fix: Add .px unit
             .padding(4.px, 8.px)
             .fontSize(12.px)
             .fontWeight(500)
-            .margin(2.px)
+            .margin(0.px) // Fix: Add .px unit
             .overflow(Overflow.Hidden)
             .styleModifier {
                 property("text-overflow", "ellipsis")
                 property("white-space", "nowrap")
-                property("user-select", "none") // Prevent text selection during drag
-                property("cursor", "grab") // Show grab cursor
-                property("transition", "box-shadow 0.2s ease")
+                property("user-select", "none")
+                property("cursor", "grab")
+                property("transition", "box-shadow 0.2s ease, transform 0.1s ease")
+                property("border-left", "4px solid rgba(255,255,255,0.5)")
             }.transition(Transition.of("background-color", 0.2.s))
     }
 
@@ -303,7 +303,31 @@ fun CalendarCell(
                             cur = cur.parentElement as? HTMLElement
                         }
 
-                        // Fallback to the currentTarget if no cell found
+                        // Find the nearest cell to snap to if no exact cell was found under pointer
+                        if (targetCell == null) {
+                            // Get all cells and find the closest one
+                            val allCells = document.querySelectorAll("[data-cell=true]")
+                            var closestDist = Double.MAX_VALUE
+
+                            // Use index-based loop to avoid ambiguous dynamic lambda types
+                            for (i in 0 until allCells.length) {
+                                val cellNode = allCells.item(i)
+                                if (cellNode is HTMLElement) {
+                                    val rect = cellNode.getBoundingClientRect()
+                                    val cellCenterX = rect.left + rect.width / 2.0
+                                    val cellCenterY = rect.top + rect.height / 2.0
+                                    val dx = e.clientX - cellCenterX
+                                    val dy = e.clientY - cellCenterY
+                                    val dist = sqrt(dx * dx + dy * dy)
+                                    if (dist < closestDist) {
+                                        closestDist = dist
+                                        targetCell = cellNode
+                                    }
+                                }
+                            }
+                        }
+
+                        // Fallback to the currentTarget if still no cell found
                         val cellElement = targetCell ?: (e.currentTarget as HTMLElement)
 
                         val eventId = e.dataTransfer?.getData("text/plain")
@@ -333,8 +357,10 @@ fun CalendarCell(
                                 val cellHeight = rect.height
                                 val minutesInHour = 60
 
-                                // Minute offset within hour
-                                val minuteOffset = ((relY / cellHeight) * minutesInHour).toInt().coerceIn(0, 59)
+                                // Snap to nearest 15-minute interval for better alignment
+                                val rawMinutes = ((relY / cellHeight) * minutesInHour).toInt()
+                                val snappedMinutes = (rawMinutes / 15) * 15 // Snap to 0, 15, 30, 45
+                                val minuteOffset = snappedMinutes.coerceIn(0, 59)
 
                                 // Create new start and end
                                 val newStartDate =
@@ -354,7 +380,7 @@ fun CalendarCell(
             },
     ) {
         // Filter events for this cell
-        val cellEvents =
+        val cellEvents: List<CalendarEvent> =
             events.filter { event ->
                 val eventStart = event.startTime
                 val eventEnd = event.endTime
@@ -433,9 +459,17 @@ fun CalendarEventItem(
     val heightPercent = durationInCell / hourMillis
     val eventHeight = max(heightPercent * 60.0, 15.0) // Minimum height of 15px
 
-    // Style based on event type
+    // Style based on event type and dragging state
     val baseStyle =
         when {
+            isDragging -> {
+                when {
+                    event.isHoliday -> HolidayEventStyle
+                    event.mode == EventMode.ACTIVE -> ActiveEventStyle
+                    event.mode == EventMode.PASSIVE -> PassiveEventStyle
+                    else -> CustomEventStyle
+                }
+            }
             event.isHoliday -> HolidayEventStyle
             event.mode == EventMode.ACTIVE -> ActiveEventStyle
             event.mode == EventMode.PASSIVE -> PassiveEventStyle
@@ -452,14 +486,16 @@ fun CalendarEventItem(
                 property("position", "absolute")
                 property("top", "${offsetTop}px")
                 property("height", "${eventHeight}px")
-                property("left", "4px")
-                property("width", "calc(100% - 8px)")
+                property("left", "0")
+                property("width", "100%")
                 property("z-index", if (isDragging || isResizing) "100" else "1")
 
                 if (isDragging) {
                     property("opacity", "0.7")
                     property("cursor", "grabbing")
-                    property("box-shadow", "0 4px 8px rgba(0,0,0,0.3)")
+                    property("box-shadow", "0 4px 12px rgba(0,0,0,0.5)")
+                    property("transform", "scale(1.02)")
+                    property("z-index", "1000")
                 }
 
                 if (isResizing) {
@@ -467,7 +503,7 @@ fun CalendarEventItem(
                 }
 
                 // If some other event is being dragged, allow drops through this element
-                if (DragState.draggingId != null && DragState.draggingId != event.id) {
+                if (GlobalDragState.draggingId != null && GlobalDragState.draggingId != event.id) {
                     property("pointer-events", "none")
                 }
             }.onClick { e ->
@@ -483,13 +519,50 @@ fun CalendarEventItem(
                 attr("draggable", "true")
 
                 // Use improved drag handlers
+                var overlayListener: ((Event) -> Unit)? = null
                 onDragStart { e ->
                     // Set this first - order matters for some browsers
                     e.dataTransfer?.setData("text/plain", event.id)
                     e.dataTransfer?.effectAllowed = "move"
 
                     // set global drag id so other event items can ignore pointer events
-                    DragState.draggingId = event.id
+                    GlobalDragState.draggingId = event.id
+
+                    // Add a semi-transparent overlay to show where the event is being dragged
+                    if (document.getElementById("drag-overlay") == null) {
+                        val overlay = document.createElement("div") as HTMLElement
+                        overlay.id = "drag-overlay"
+                        overlay.style.setProperty("position", "absolute")
+                        overlay.style.setProperty("pointer-events", "none")
+                        overlay.style.setProperty("z-index", "9999")
+                        overlay.style.setProperty("border", "2px dashed #3b82f6")
+                        overlay.style.setProperty("background", "rgba(59, 130, 246, 0.2)")
+                        overlay.style.setProperty("border-radius", "4px")
+                        document.body?.appendChild(overlay)
+                    }
+
+                    // Get current element dimensions before setting up the event listener
+                    val element = e.currentTarget as HTMLElement
+                    val width = element.offsetWidth
+                    val height = element.offsetHeight
+
+                    // Create and register dragover listener to update overlay position
+                    val handle: (Event) -> Unit = { ev: Event ->
+                        val me = ev as? MouseEvent
+                        val overlay = document.getElementById("drag-overlay") as? HTMLElement
+                        if (me != null && overlay != null) {
+                            overlay.style.width = "${width}px"
+                            overlay.style.height = "${height}px"
+                            val left = me.clientX - 20
+                            val top = me.clientY - 10
+                            overlay.style.left = "${left}px"
+                            overlay.style.top = "${top}px"
+                            overlay.style.display = "block"
+                        }
+                    }
+
+                    overlayListener = handle
+                    document.addEventListener("dragover", handle)
 
                     // Create custom drag image with clearer visibility and stable id
                     try {
@@ -497,26 +570,22 @@ fun CalendarEventItem(
                         val dragId = "drag-image-${event.id}"
                         dragImage.id = dragId
                         dragImage.style.position = "absolute"
-                        dragImage.style.top = "0"
-                        dragImage.style.left = "0"
+                        dragImage.style.top = "-1000px"
+                        dragImage.style.left = "-1000px"
                         dragImage.style.backgroundColor = "#3b82f6"
                         dragImage.style.color = "white"
                         dragImage.style.padding = "8px 12px"
                         dragImage.style.borderRadius = "4px"
                         dragImage.style.fontSize = "14px"
                         dragImage.style.fontWeight = "bold"
-                        dragImage.style.asDynamic().pointerEvents = "none"
+                        dragImage.style.setProperty("pointer-events", "none")
                         dragImage.style.opacity = "0.8"
                         dragImage.style.boxShadow = "0 2px 10px rgba(0,0,0,0.2)"
                         dragImage.style.zIndex = "1000"
                         dragImage.textContent = event.title
 
-                        // Position offscreen
-                        dragImage.style.position = "absolute"
-                        dragImage.style.top = "-1000px"
                         document.body?.appendChild(dragImage)
 
-                        // Use the custom drag image
                         e.dataTransfer?.setDragImage(dragImage, 20, 20)
                     } catch (ex: Exception) {
                         console.error("Error setting drag image: ${ex.message}")
@@ -525,22 +594,29 @@ fun CalendarEventItem(
                     isDragging = true
                 }
 
-                onDrag { e ->
-                    // Additional tracking during drag
-                }
-
                 onDragEnd { e ->
+                    e.preventDefault()
+
                     // Remove drag image if still present
                     try {
                         val dragId = "drag-image-${event.id}"
                         val img = document.getElementById(dragId)
-                        if (img != null) document.body?.removeChild(img)
+                        img?.let { document.body?.removeChild(it) }
+
+                        // Remove drag overlay and event listener
+                        val overlay = document.getElementById("drag-overlay")
+                        if (overlay != null) {
+                            document.body?.removeChild(overlay)
+                        }
+
+                        overlayListener?.let { document.removeEventListener("dragover", it) }
+                        overlayListener = null
                     } catch (ex: Exception) {
-                        console.error("Error removing drag image: ${ex.message}")
+                        console.error("Error cleaning up after drag: ${ex.message}")
                     }
                     isDragging = false
                     // clear global drag id
-                    DragState.draggingId = null
+                    GlobalDragState.draggingId = null
                 }
 
                 // Custom resize handler on mousedown
@@ -559,8 +635,8 @@ fun CalendarEventItem(
                         val originalEndTime = event.endTime.getTime()
 
                         // Fix: Store handler references in variables first
-                        var mouseMoveHandler: ((Event) -> Unit)? = null
-                        var mouseUpHandler: ((Event) -> Unit)? = null
+                        var mouseMoveHandler: ((Event) -> Unit) = { _ -> }
+                        var mouseUpHandler: ((Event) -> Unit) = { _ -> }
 
                         mouseMoveHandler = { moveEvent: Event ->
                             if (moveEvent is MouseEvent) {
@@ -594,11 +670,12 @@ fun CalendarEventItem(
         Column(
             Modifier
                 .fillMaxWidth()
-                .padding(4.px)
+                .padding(4.px, 8.px)
                 .styleModifier {
                     property("display", "flex")
                     property("flex-direction", "column")
                     property("gap", "2px")
+                    property("text-align", "center")
                 },
         ) {
             SpanText(
