@@ -343,22 +343,6 @@ fun HomePage() {
             }
         }
 
-        // Calendar Navigation
-        CalendarNavigation(
-            currentDate = displayDate,
-            onPrevWeek = {
-                val newDate = Date(displayDate.getTime() - 7 * 24 * 60 * 60 * 1000)
-                displayDate = newDate
-            },
-            onNextWeek = {
-                val newDate = Date(displayDate.getTime() + 7 * 24 * 60 * 60 * 1000)
-                displayDate = newDate
-            },
-            onToday = {
-                displayDate = Date()
-            },
-        )
-
         // Calendar Grid
         Box(
             Modifier
