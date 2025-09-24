@@ -14,6 +14,9 @@ import org.jetbrains.compose.web.css.*
 import org.jetbrains.compose.web.dom.*
 import org.w3c.dom.HTMLElement
 import xyz.malefic.staticsite.components.calendar.CalendarCell
+import xyz.malefic.staticsite.components.WeeklyTaskManager
+import xyz.malefic.staticsite.components.WeeklyTask
+import xyz.malefic.staticsite.components.TaskPriority
 import xyz.malefic.staticsite.util.CalendarEvent
 import xyz.malefic.staticsite.util.CalendarUtils
 import xyz.malefic.staticsite.util.EventMode
@@ -71,6 +74,9 @@ fun HomePage() {
             }
         }
 
+    // State for weekly tasks
+    val tasks = remember { mutableStateListOf<WeeklyTask>() }
+
     // Calendar configuration - removed EventStyleConfig as it doesn't exist
     // LaunchedEffect(Unit) {
     //     // Event style configuration would go here
@@ -82,6 +88,7 @@ fun HomePage() {
     var newEventDescription by remember { mutableStateOf("") }
     var newEventStartTime by remember { mutableStateOf<Date?>(null) }
     var newEventEndTime by remember { mutableStateOf<Date?>(null) }
+    var newEventMode by remember { mutableStateOf(EventMode.PASSIVE) }
 
     // Get month and year for display
     val monthNames =
@@ -697,6 +704,65 @@ fun HomePage() {
                             },
                         )
 
+                        // Event Mode Selection
+                        SpanText(
+                            "Event Mode",
+                            Modifier
+                                .fontSize(14.px)
+                                .fontWeight(500)
+                                .margin(bottom = 8.px),
+                        )
+
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .margin(bottom = 16.px)
+                                .styleModifier {
+                                    property("gap", "8px")
+                                }
+                        ) {
+                            listOf(
+                                EventMode.PASSIVE to "Passive",
+                                EventMode.ACTIVE to "Active",
+                                EventMode.CUSTOM to "Custom"
+                            ).forEach { (mode, label) ->
+                                Button(
+                                    attrs = {
+                                        onClick { newEventMode = mode }
+                                        style {
+                                            padding(8.px, 16.px)
+                                            backgroundColor(
+                                                if (newEventMode == mode) {
+                                                    com.varabyte.kobweb.compose.ui.graphics.Color.rgba(
+                                                        59f / 255f,
+                                                        130f / 255f,
+                                                        246f / 255f,
+                                                        1f,
+                                                    )
+                                                } else {
+                                                    com.varabyte.kobweb.compose.ui.graphics.Color.rgba(
+                                                        229f / 255f,
+                                                        231f / 255f,
+                                                        235f / 255f,
+                                                        1f,
+                                                    )
+                                                }
+                                            )
+                                            color(
+                                                if (newEventMode == mode) Colors.White else Colors.Black
+                                            )
+                                            border(0.px)
+                                            borderRadius(4.px)
+                                            cursor(Cursor.Pointer)
+                                            fontSize(12.px)
+                                        }
+                                    },
+                                ) {
+                                    SpanText(label)
+                                }
+                            }
+                        }
+
                         Row(
                             modifier =
                                 Modifier
@@ -712,6 +778,7 @@ fun HomePage() {
                                         showEventDialog = false
                                         newEventTitle = ""
                                         newEventDescription = ""
+                                        newEventMode = EventMode.PASSIVE
                                     }
                                     style {
                                         padding(8.px, 16.px)
@@ -746,7 +813,7 @@ fun HomePage() {
                                                     description = newEventDescription,
                                                     startTime = startTime,
                                                     endTime = endTime,
-                                                    mode = EventMode.PASSIVE,
+                                                    mode = newEventMode,
                                                 )
 
                                             events.add(newEvent)
@@ -754,6 +821,7 @@ fun HomePage() {
                                             showEventDialog = false
                                             newEventTitle = ""
                                             newEventDescription = ""
+                                            newEventMode = EventMode.PASSIVE
                                         }
                                     }
                                     style {
@@ -780,5 +848,29 @@ fun HomePage() {
                 }
             }
         }
+
+        // Weekly Task Manager
+        WeeklyTaskManager(
+            tasks = tasks,
+            onTaskAdd = { task ->
+                tasks.add(task)
+            },
+            onTaskUpdate = { updatedTask ->
+                val index = tasks.indexOfFirst { it.id == updatedTask.id }
+                if (index >= 0) {
+                    tasks[index] = updatedTask
+                }
+            },
+            onTaskDelete = { deletedTask ->
+                val index = tasks.indexOfFirst { it.id == deletedTask.id }
+                if (index >= 0) {
+                    tasks.removeAt(index)
+                }
+            },
+            onAutoSort = { autoSortedEvents ->
+                // Add the auto-sorted events to the calendar
+                events.addAll(autoSortedEvents)
+            }
+        )
     }
 }

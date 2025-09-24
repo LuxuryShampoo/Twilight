@@ -17,9 +17,11 @@ import org.jetbrains.compose.web.css.*
 import org.jetbrains.compose.web.css.DisplayStyle
 import org.jetbrains.compose.web.css.LineStyle
 import org.jetbrains.compose.web.dom.*
+import org.jetbrains.compose.web.attributes.*
 import org.w3c.dom.HTMLElement
 import xyz.malefic.staticsite.util.CalendarEvent
 import xyz.malefic.staticsite.util.CalendarUtils
+import xyz.malefic.staticsite.util.ThemeManager
 import kotlin.js.Date
 import com.varabyte.kobweb.compose.ui.graphics.Color as Kolor
 
@@ -251,12 +253,27 @@ fun CalendarCell(
     // For debugging - assign a unique ID to help track this cell
     val cellId = "cell-${date.getFullYear()}-${date.getMonth()}-${date.getDate()}-$hour"
 
-    // Use different style based on drop target state
-    val cellStyle = if (isDropTarget) CalendarCellDropTargetStyle else CalendarCellStyle
-
     Box(
-        cellStyle
-            .toModifier()
+        Modifier
+            .backgroundColor(
+                if (isDropTarget) {
+                    Color(if (ThemeManager.isDarkMode) "#1a3a52" else "#f0f9ff")
+                } else {
+                    Color(ThemeManager.Colors.calendarBackground)
+                }
+            )
+            .border(
+                1.px, 
+                LineStyle.Solid, 
+                Color(if (isDropTarget) {
+                    if (ThemeManager.isDarkMode) "#3b82f6" else "#3b82f6"
+                } else {
+                    ThemeManager.Colors.border
+                })
+            )
+            .minHeight(60.px)
+            .position(Position.Relative)
+            .overflow(Overflow.Visible)
             .attrsModifier {
                 // Add data attributes for drag and drop
                 id(cellId)
@@ -312,152 +329,325 @@ fun CalendarCell(
                 }
             },
     ) {
-        // Time slot indicator (optional)
+        // Time slot indicator (optional) - theme aware
         Box(
             Modifier
                 .fillMaxWidth()
                 .height(4.px)
-                .backgroundColor(Kolor.rgba(240, 240, 240, 0.5f))
+                .backgroundColor(
+                    Color(if (ThemeManager.isDarkMode) "#404040" else "#f0f0f0")
+                )
                 .align(Alignment.TopStart),
         )
 
-        // Event indicators with hover effects and text fading
-        events.forEach { event ->
-            val isActive = event == editingEvent
-            var isHovered by remember { mutableStateOf(false) }
+        // Separate events by mode for positioning
+        val activeEvents = events.filter { !it.isPassive }
+        val passiveEvents = events.filter { it.isPassive }
 
+        // Active events on the left side
+        if (activeEvents.isNotEmpty()) {
             Box(
                 Modifier
-                    .fillMaxWidth()
-                    .onClick {
-                        // On click, set the event to editing state
-                        editingEvent = if (isActive) null else event
-                    }
-                    .onMouseEnter { isHovered = true }
-                    .onMouseLeave { isHovered = false }
-                    .padding(4.px)
-                    .backgroundColor(
-                        when {
-                            event.isHoliday -> Color("#10b981")
-                            event.isCustom -> Color("#8b5cf6")
-                            event.isPassive -> Color("#3b82f6")
-                            else -> Color("#dc2626")
-                        }
-                    )
-                    .borderRadius(4.px)
-                    .zIndex(if (isHovered) 10 else 1) // Higher z-index when hovered
-                    .styleModifier {
-                        // Add smooth transitions for hover effects
-                        property("transition", "all 0.2s ease-in-out")
-                        if (isHovered) {
-                            property("transform", "scale(1.02)")
-                            property("box-shadow", "0 4px 12px rgba(0,0,0,0.15)")
-                        }
-                    }
-                    .position(Position.Relative), // Ensure tooltip positioning works
+                    .width(50.percent)
+                    .align(Alignment.CenterStart)
+                    .padding(2.px)
             ) {
-                // Event content with anti-repetition handling
-                SpanText(
-                    text = if (isHovered) "${event.title} (${CalendarUtils.formatTime(event.startTime)} - ${CalendarUtils.formatTime(event.endTime)})" else event.title,
-                    modifier = Modifier
-                        .color(Colors.White)
-                        .fontSize(if (isHovered) 12.px else 14.px)
-                        .fontWeight(FontWeight.Bold)
-                        .styleModifier {
-                            // Prevent text repetition by controlling overflow
-                            property("white-space", "nowrap")
-                            property("overflow", "hidden")
-                            property("text-overflow", "ellipsis")
-                            property("max-width", "100%")
-                            // Text fade effect when not hovered
-                            if (!isHovered && !isActive) {
-                                property("opacity", "0.85")
-                                property("transition", "opacity 0.3s ease-in-out")
-                            } else {
-                                property("opacity", "1")
+                Column {
+                    activeEvents.forEachIndexed { index, event ->
+                        val isActive = event == editingEvent
+                        var isHovered by remember { mutableStateOf(false) }
+                        val isDragging = GlobalDragState.draggingId == event.id
+
+                        Box(
+                            Modifier
+                                .fillMaxWidth()
+                                .margin(bottom = if (index < activeEvents.size - 1) 2.px else 0.px)
+                                .onClick {
+                                    editingEvent = if (isActive) null else event
+                                }
+                                .onMouseEnter { 
+                                    if (!isDragging) isHovered = true 
+                                }
+                                .onMouseLeave { 
+                                    if (!isDragging) isHovered = false 
+                                }
+                                .padding(4.px)
+                                .backgroundColor(
+                                    Color(if (ThemeManager.isDarkMode) "#ef4444" else "#dc2626")
+                                ) // Red for active events
+                                .borderRadius(4.px)
+                                .zIndex(if (isHovered && !isDragging) 10 else 1)
+                                .styleModifier {
+                                    if (!isDragging) {
+                                        property("transition", "all 0.2s ease-in-out")
+                                        if (isHovered) {
+                                            property("transform", "scale(1.02)")
+                                            property("box-shadow", "0 4px 12px rgba(0,0,0,0.15)")
+                                        }
+                                    }
+                                    property("cursor", if (isDragging) "grabbing" else "grab")
+                                    property("user-select", "none")
+                                }
+                                .position(Position.Relative)
+                                .attrsModifier {
+                                    attr("draggable", "true")
+                                    onDragStart { e ->
+                                        GlobalDragState.draggingId = event.id
+                                        e.dataTransfer?.effectAllowed = "move"
+                                        e.dataTransfer?.setData("text/plain", event.id)
+                                        isHovered = false
+                                    }
+                                    onDragEnd { e ->
+                                        GlobalDragState.draggingId = null
+                                    }
+                                },
+                        ) {
+                            SpanText(
+                                text = event.title,
+                                modifier = Modifier
+                                    .color(Colors.White)
+                                    .fontSize(12.px)
+                                    .fontWeight(FontWeight.Bold)
+                                    .styleModifier {
+                                        property("white-space", "nowrap")
+                                        property("overflow", "hidden")
+                                        property("text-overflow", "ellipsis")
+                                        property("max-width", "100%")
+                                        property("pointer-events", "none")
+                                        if (!isHovered && !isActive && !isDragging) {
+                                            property("opacity", "0.85")
+                                            property("transition", "opacity 0.3s ease-in-out")
+                                        } else {
+                                            property("opacity", "1")
+                                        }
+                                    }
+                            )
+
+                            // Tooltip for active events
+                            if (isHovered && !isDragging) {
+                                Box(
+                                    Modifier
+                                        .position(Position.Absolute)
+                                        .top((-40).px)
+                                        .left(0.px)
+                                        .backgroundColor(
+                                            Color(if (ThemeManager.isDarkMode) "#2d3748" else "#1f2937")
+                                        )
+                                        .color(
+                                            Color(if (ThemeManager.isDarkMode) "#e2e8f0" else "#ffffff")
+                                        )
+                                        .padding(8.px)
+                                        .borderRadius(4.px)
+                                        .fontSize(12.px)
+                                        .zIndex(100)
+                                        .styleModifier {
+                                            property("box-shadow", "0 2px 8px rgba(0,0,0,0.3)")
+                                            property("max-width", "200px")
+                                            property("word-wrap", "break-word")
+                                            property("pointer-events", "none")
+                                        }
+                                ) {
+                                    SpanText(
+                                        if (event.description.isNotBlank()) {
+                                            "${event.title} (${CalendarUtils.formatTime(event.startTime)} - ${CalendarUtils.formatTime(event.endTime)})\n${event.description}"
+                                        } else {
+                                            "${event.title} (${CalendarUtils.formatTime(event.startTime)} - ${CalendarUtils.formatTime(event.endTime)})"
+                                        }
+                                    )
+                                }
+                            }
+
+                            // Delete button for active events
+                            if (isActive) {
+                                Box(
+                                    Modifier
+                                        .align(Alignment.TopEnd)
+                                        .padding(2.px)
+                                        .backgroundColor(Color("#dc2626"))
+                                        .borderRadius(2.px)
+                                        .padding(4.px)
+                                        .cursor(Cursor.Pointer)
+                                        .onClick {
+                                            editingEvent?.let { event ->
+                                                onEventDelete(event)
+                                                editingEvent = null
+                                            }
+                                        }
+                                        .styleModifier {
+                                            property("transition", "all 0.2s ease")
+                                        }
+                                ) {
+                                    SpanText(
+                                        "×",
+                                        Modifier
+                                            .color(Colors.White)
+                                            .fontSize(12.px)
+                                            .fontWeight(FontWeight.Bold)
+                                            .styleModifier {
+                                                property("line-height", "1")
+                                                property("user-select", "none")
+                                            }
+                                    )
+                                }
                             }
                         }
-                )
-
-                // Tooltip showing event details on hover
-                if (isHovered && event.description.isNotBlank()) {
-                    Box(
-                        Modifier
-                            .position(Position.Absolute)
-                            .top((-40).px)
-                            .left(0.px)
-                            .backgroundColor(Color("#1f2937"))
-                            .color(Colors.White)
-                            .padding(8.px)
-                            .borderRadius(4.px)
-                            .fontSize(12.px)
-                            .zIndex(100)
-                            .styleModifier {
-                                property("box-shadow", "0 2px 8px rgba(0,0,0,0.3)")
-                                property("max-width", "200px")
-                                property("word-wrap", "break-word")
-                            }
-                    ) {
-                        SpanText(event.description)
                     }
                 }
             }
-
-            // Debug: Log event rendering (commented out to reduce console spam)
-            // LaunchedEffect(event) {
-            //     console.log("Rendered event: ${event.title} at ${event.date} ${event.hour}")
-            // }
         }
 
-        // Event editing UI - enhanced to prevent text repetition during resize
-        if (editingEvent != null && events.contains(editingEvent)) {
-            // Draggable resize handle (bottom border of event)
+        // Passive events on the right side with transparency for stacking
+        if (passiveEvents.isNotEmpty()) {
             Box(
                 Modifier
-                    .align(Alignment.BottomCenter)
-                    .fillMaxWidth()
-                    .height(4.px)
-                    .backgroundColor(Color("#ffffff"))
-                    .cursor(Cursor.Pointer)
-                    .styleModifier {
-                        property("opacity", "0.7")
-                        property("transition", "opacity 0.2s ease")
-                    }
-                    .onMouseEnter {
-                        // Visual feedback for resize handle
-                    }
-            )
-
-            // Simple delete button
-            Box(
-                Modifier
-                    .align(Alignment.TopEnd)
+                    .width(50.percent)
+                    .align(Alignment.CenterEnd)
                     .padding(2.px)
-                    .backgroundColor(Color("#dc2626"))
-                    .borderRadius(2.px)
-                    .padding(4.px)
-                    .cursor(Cursor.Pointer)
-                    .onClick {
-                        editingEvent?.let { event ->
-                            onEventDelete(event)
-                            editingEvent = null
-                        }
-                    }
-                    .styleModifier {
-                        property("transition", "all 0.2s ease")
-                    }
             ) {
-                SpanText(
-                    "×",
-                    Modifier
-                        .color(Colors.White)
-                        .fontSize(12.px)
-                        .fontWeight(FontWeight.Bold)
-                        .styleModifier {
-                            property("line-height", "1")
-                            property("user-select", "none")
+                Column {
+                    passiveEvents.forEachIndexed { index, event ->
+                        val isActive = event == editingEvent
+                        var isHovered by remember { mutableStateOf(false) }
+                        val isDragging = GlobalDragState.draggingId == event.id
+                        // Add transparency for stacked events (top one more transparent)
+                        val alpha = if (index == 0 && passiveEvents.size > 1) 0.8f else 1f
+
+                        Box(
+                            Modifier
+                                .fillMaxWidth()
+                                .margin(bottom = if (index < passiveEvents.size - 1) 2.px else 0.px)
+                                .onClick {
+                                    editingEvent = if (isActive) null else event
+                                }
+                                .onMouseEnter { 
+                                    if (!isDragging) isHovered = true 
+                                }
+                                .onMouseLeave { 
+                                    if (!isDragging) isHovered = false 
+                                }
+                                .padding(4.px)
+                                .backgroundColor(
+                                    Color(if (ThemeManager.isDarkMode) "#3b82f6" else "#2563eb")
+                                ) // Blue for passive events
+                                .borderRadius(4.px)
+                                .zIndex(if (isHovered && !isDragging) 10 else (passiveEvents.size - index))
+                                .styleModifier {
+                                    property("opacity", alpha.toString())
+                                    if (!isDragging) {
+                                        property("transition", "all 0.2s ease-in-out")
+                                        if (isHovered) {
+                                            property("transform", "scale(1.02)")
+                                            property("box-shadow", "0 4px 12px rgba(0,0,0,0.15)")
+                                        }
+                                    }
+                                    property("cursor", if (isDragging) "grabbing" else "grab")
+                                    property("user-select", "none")
+                                }
+                                .position(Position.Relative)
+                                .attrsModifier {
+                                    attr("draggable", "true")
+                                    onDragStart { e ->
+                                        GlobalDragState.draggingId = event.id
+                                        e.dataTransfer?.effectAllowed = "move"
+                                        e.dataTransfer?.setData("text/plain", event.id)
+                                        isHovered = false
+                                    }
+                                    onDragEnd { e ->
+                                        GlobalDragState.draggingId = null
+                                    }
+                                },
+                        ) {
+                            SpanText(
+                                text = event.title,
+                                modifier = Modifier
+                                    .color(Colors.White)
+                                    .fontSize(12.px)
+                                    .fontWeight(FontWeight.Bold)
+                                    .styleModifier {
+                                        property("white-space", "nowrap")
+                                        property("overflow", "hidden")
+                                        property("text-overflow", "ellipsis")
+                                        property("max-width", "100%")
+                                        property("pointer-events", "none")
+                                        if (!isHovered && !isActive && !isDragging) {
+                                            property("opacity", "0.85")
+                                            property("transition", "opacity 0.3s ease-in-out")
+                                        } else {
+                                            property("opacity", "1")
+                                        }
+                                    }
+                            )
+
+                            // Tooltip for passive events
+                            if (isHovered && !isDragging) {
+                                Box(
+                                    Modifier
+                                        .position(Position.Absolute)
+                                        .top((-40).px)
+                                        .right(0.px)
+                                        .backgroundColor(
+                                            Color(if (ThemeManager.isDarkMode) "#2d3748" else "#1f2937")
+                                        )
+                                        .color(
+                                            Color(if (ThemeManager.isDarkMode) "#e2e8f0" else "#ffffff")
+                                        )
+                                        .padding(8.px)
+                                        .borderRadius(4.px)
+                                        .fontSize(12.px)
+                                        .zIndex(100)
+                                        .styleModifier {
+                                            property("box-shadow", "0 2px 8px rgba(0,0,0,0.3)")
+                                            property("max-width", "200px")
+                                            property("word-wrap", "break-word")
+                                            property("pointer-events", "none")
+                                        }
+                                ) {
+                                    SpanText(
+                                        if (event.description.isNotBlank()) {
+                                            "${event.title} (${CalendarUtils.formatTime(event.startTime)} - ${CalendarUtils.formatTime(event.endTime)})\n${event.description}"
+                                        } else {
+                                            "${event.title} (${CalendarUtils.formatTime(event.startTime)} - ${CalendarUtils.formatTime(event.endTime)})"
+                                        }
+                                    )
+                                }
+                            }
+
+                            // Delete button for passive events
+                            if (isActive) {
+                                Box(
+                                    Modifier
+                                        .align(Alignment.TopEnd)
+                                        .padding(2.px)
+                                        .backgroundColor(Color("#dc2626"))
+                                        .borderRadius(2.px)
+                                        .padding(4.px)
+                                        .cursor(Cursor.Pointer)
+                                        .onClick {
+                                            editingEvent?.let { event ->
+                                                onEventDelete(event)
+                                                editingEvent = null
+                                            }
+                                        }
+                                        .styleModifier {
+                                            property("transition", "all 0.2s ease")
+                                        }
+                                ) {
+                                    SpanText(
+                                        "×",
+                                        Modifier
+                                            .color(Colors.White)
+                                            .fontSize(12.px)
+                                            .fontWeight(FontWeight.Bold)
+                                            .styleModifier {
+                                                property("line-height", "1")
+                                                property("user-select", "none")
+                                            }
+                                    )
+                                }
+                            }
                         }
-                )
+                    }
+                }
             }
         }
     }
