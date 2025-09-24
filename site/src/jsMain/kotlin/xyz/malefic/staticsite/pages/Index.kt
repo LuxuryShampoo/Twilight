@@ -13,6 +13,9 @@ import org.jetbrains.compose.web.css.*
 import org.jetbrains.compose.web.dom.*
 import org.w3c.dom.HTMLElement
 import xyz.malefic.staticsite.components.calendar.CalendarCell
+import xyz.malefic.staticsite.components.WeeklyTaskManager
+import xyz.malefic.staticsite.components.WeeklyTask
+import xyz.malefic.staticsite.components.TaskPriority
 import xyz.malefic.staticsite.util.CalendarEvent
 import xyz.malefic.staticsite.util.CalendarUtils
 import xyz.malefic.staticsite.util.EventMode
@@ -69,6 +72,9 @@ fun HomePage() {
                 add(testEvent)
             }
         }
+
+    // State for weekly tasks
+    val tasks = remember { mutableStateListOf<WeeklyTask>() }
 
     // Calendar configuration - removed EventStyleConfig as it doesn't exist
     // LaunchedEffect(Unit) {
@@ -840,5 +846,29 @@ fun HomePage() {
                 }
             }
         }
+
+        // Weekly Task Manager
+        WeeklyTaskManager(
+            tasks = tasks,
+            onTaskAdd = { task ->
+                tasks.add(task)
+            },
+            onTaskUpdate = { updatedTask ->
+                val index = tasks.indexOfFirst { it.id == updatedTask.id }
+                if (index >= 0) {
+                    tasks[index] = updatedTask
+                }
+            },
+            onTaskDelete = { deletedTask ->
+                val index = tasks.indexOfFirst { it.id == deletedTask.id }
+                if (index >= 0) {
+                    tasks.removeAt(index)
+                }
+            },
+            onAutoSort = { autoSortedEvents ->
+                // Add the auto-sorted events to the calendar
+                events.addAll(autoSortedEvents)
+            }
+        )
     }
 }

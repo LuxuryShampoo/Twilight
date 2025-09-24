@@ -21,6 +21,7 @@ import org.jetbrains.compose.web.attributes.*
 import org.w3c.dom.HTMLElement
 import xyz.malefic.staticsite.util.CalendarEvent
 import xyz.malefic.staticsite.util.CalendarUtils
+import xyz.malefic.staticsite.util.ThemeManager
 import kotlin.js.Date
 import com.varabyte.kobweb.compose.ui.graphics.Color as Kolor
 
@@ -252,12 +253,27 @@ fun CalendarCell(
     // For debugging - assign a unique ID to help track this cell
     val cellId = "cell-${date.getFullYear()}-${date.getMonth()}-${date.getDate()}-$hour"
 
-    // Use different style based on drop target state
-    val cellStyle = if (isDropTarget) CalendarCellDropTargetStyle else CalendarCellStyle
-
     Box(
-        cellStyle
-            .toModifier()
+        Modifier
+            .backgroundColor(
+                if (isDropTarget) {
+                    Color(if (ThemeManager.isDarkMode) "#1a3a52" else "#f0f9ff")
+                } else {
+                    Color(ThemeManager.Colors.calendarBackground)
+                }
+            )
+            .border(
+                1.px, 
+                LineStyle.Solid, 
+                Color(if (isDropTarget) {
+                    if (ThemeManager.isDarkMode) "#3b82f6" else "#3b82f6"
+                } else {
+                    ThemeManager.Colors.border
+                })
+            )
+            .minHeight(60.px)
+            .position(Position.Relative)
+            .overflow(Overflow.Visible)
             .attrsModifier {
                 // Add data attributes for drag and drop
                 id(cellId)
@@ -313,12 +329,14 @@ fun CalendarCell(
                 }
             },
     ) {
-        // Time slot indicator (optional)
+        // Time slot indicator (optional) - theme aware
         Box(
             Modifier
                 .fillMaxWidth()
                 .height(4.px)
-                .backgroundColor(Kolor.rgba(240, 240, 240, 0.5f))
+                .backgroundColor(
+                    Color(if (ThemeManager.isDarkMode) "#404040" else "#f0f0f0")
+                )
                 .align(Alignment.TopStart),
         )
 
@@ -354,7 +372,9 @@ fun CalendarCell(
                                     if (!isDragging) isHovered = false 
                                 }
                                 .padding(4.px)
-                                .backgroundColor(Color("#dc2626")) // Red for active events
+                                .backgroundColor(
+                                    Color(if (ThemeManager.isDarkMode) "#ef4444" else "#dc2626")
+                                ) // Red for active events
                                 .borderRadius(4.px)
                                 .zIndex(if (isHovered && !isDragging) 10 else 1)
                                 .styleModifier {
@@ -410,8 +430,12 @@ fun CalendarCell(
                                         .position(Position.Absolute)
                                         .top((-40).px)
                                         .left(0.px)
-                                        .backgroundColor(Color("#1f2937"))
-                                        .color(Colors.White)
+                                        .backgroundColor(
+                                            Color(if (ThemeManager.isDarkMode) "#2d3748" else "#1f2937")
+                                        )
+                                        .color(
+                                            Color(if (ThemeManager.isDarkMode) "#e2e8f0" else "#ffffff")
+                                        )
                                         .padding(8.px)
                                         .borderRadius(4.px)
                                         .fontSize(12.px)
@@ -502,7 +526,9 @@ fun CalendarCell(
                                     if (!isDragging) isHovered = false 
                                 }
                                 .padding(4.px)
-                                .backgroundColor(Color("#3b82f6")) // Blue for passive events
+                                .backgroundColor(
+                                    Color(if (ThemeManager.isDarkMode) "#3b82f6" else "#2563eb")
+                                ) // Blue for passive events
                                 .borderRadius(4.px)
                                 .zIndex(if (isHovered && !isDragging) 10 else (passiveEvents.size - index))
                                 .styleModifier {
@@ -559,8 +585,12 @@ fun CalendarCell(
                                         .position(Position.Absolute)
                                         .top((-40).px)
                                         .right(0.px)
-                                        .backgroundColor(Color("#1f2937"))
-                                        .color(Colors.White)
+                                        .backgroundColor(
+                                            Color(if (ThemeManager.isDarkMode) "#2d3748" else "#1f2937")
+                                        )
+                                        .color(
+                                            Color(if (ThemeManager.isDarkMode) "#e2e8f0" else "#ffffff")
+                                        )
                                         .padding(8.px)
                                         .borderRadius(4.px)
                                         .fontSize(12.px)

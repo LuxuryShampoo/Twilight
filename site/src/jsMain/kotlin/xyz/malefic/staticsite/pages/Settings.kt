@@ -281,13 +281,14 @@ fun SettingsPage() {
                                 Text("Theme Selection")
                             }
 
-                            // Theme Grid
+                            // Theme Grid - More compact with color previews
                             Div(
                                 attrs = {
                                     style {
                                         display(DisplayStyle.Grid)
-                                        property("grid-template-columns", "repeat(auto-fill, minmax(180px, 1fr))")
-                                        gap(16.px)
+                                        property("grid-template-columns", "repeat(auto-fill, minmax(140px, 1fr))")
+                                        gap(12.px)
+                                        marginBottom(24.px)
                                     }
                                 },
                             ) {
@@ -304,7 +305,7 @@ fun SettingsPage() {
                                                     ),
                                                 )
                                                 borderRadius(8.px)
-                                                padding(16.px)
+                                                padding(12.px)
                                                 cursor(Cursor.Pointer)
                                                 backgroundColor(
                                                     org.jetbrains.compose.web.css.Color(
@@ -316,48 +317,58 @@ fun SettingsPage() {
                                                     ),
                                                 )
                                                 property("transition", "all 0.2s ease")
+                                                property("min-height", "80px")
+                                                display(DisplayStyle.Flex)
+                                                flexDirection(FlexDirection.Column)
+                                                property("align-items", "center")
+                                                property("justify-content", "center")
                                             }
                                         },
                                     ) {
-                                        // Theme Preview
-                                        Box(
-                                            Modifier
-                                                .fillMaxWidth()
-                                                .height(80.px)
-                                                .backgroundColor(
-                                                    org.jetbrains.compose.web.css
-                                                        .Color(theme.backgroundColor),
-                                                ).borderRadius(4.px)
-                                                .margin(bottom = 12.px),
+                                        // Compact color preview circles
+                                        Div(
+                                            attrs = {
+                                                style {
+                                                    display(DisplayStyle.Flex)
+                                                    property("justify-content", "center")
+                                                    property("align-items", "center")
+                                                    gap(8.px)
+                                                    marginBottom(8.px)
+                                                }
+                                            }
                                         ) {
-                                            // Color bars representing the theme
+                                            // Primary color circle
                                             Div(
                                                 attrs = {
                                                     style {
-                                                        width(100.percent)
-                                                        height(24.px)
+                                                        width(20.px)
+                                                        height(20.px)
                                                         backgroundColor(
-                                                            org.jetbrains.compose.web.css
-                                                                .Color(theme.primaryColor),
+                                                            org.jetbrains.compose.web.css.Color(theme.primaryColor)
                                                         )
-                                                        marginBottom(8.px)
-                                                        borderRadius(2.px)
+                                                        borderRadius(50.percent)
+                                                        border(2.px, LineStyle.Solid, 
+                                                            org.jetbrains.compose.web.css.Color(ThemeManager.Colors.border)
+                                                        )
                                                     }
-                                                },
+                                                }
                                             ) {}
-
+                                            
+                                            // Secondary color circle
                                             Div(
                                                 attrs = {
                                                     style {
-                                                        width(75.percent)
+                                                        width(16.px)
                                                         height(16.px)
                                                         backgroundColor(
-                                                            org.jetbrains.compose.web.css
-                                                                .Color(theme.secondaryColor),
+                                                            org.jetbrains.compose.web.css.Color(theme.secondaryColor)
                                                         )
-                                                        borderRadius(2.px)
+                                                        borderRadius(50.percent)
+                                                        border(2.px, LineStyle.Solid, 
+                                                            org.jetbrains.compose.web.css.Color(ThemeManager.Colors.border)
+                                                        )
                                                     }
-                                                },
+                                                }
                                             ) {}
                                         }
 
@@ -366,6 +377,7 @@ fun SettingsPage() {
                                             attrs = {
                                                 style {
                                                     fontWeight(600)
+                                                    fontSize(14.px)
                                                     color(
                                                         org.jetbrains.compose.web.css
                                                             .Color(ThemeManager.Colors.text),
