@@ -13,10 +13,10 @@ import org.jetbrains.compose.web.css.*
 import org.jetbrains.compose.web.dom.*
 import org.w3c.dom.HTMLElement
 import xyz.malefic.staticsite.components.calendar.CalendarCell
-import xyz.malefic.staticsite.components.calendar.EventStyleConfig
-import xyz.malefic.staticsite.util.*
 import xyz.malefic.staticsite.util.CalendarEvent
+import xyz.malefic.staticsite.util.CalendarUtils
 import xyz.malefic.staticsite.util.EventMode
+import xyz.malefic.staticsite.util.ThemeManager
 import kotlin.js.Date
 
 @Page
@@ -70,16 +70,10 @@ fun HomePage() {
             }
         }
 
-    // Initialize event visual style configuration once when the page loads
-    LaunchedEffect(Unit) {
-        EventStyleConfig.eventWidthPercent = 92.0
-        EventStyleConfig.minVisualHeightPx = 40
-        EventStyleConfig.heightScale = 1.1
-        EventStyleConfig.defaultBackground = "#00b6ae"
-        EventStyleConfig.borderRadiusPx = 8
-        EventStyleConfig.horizontalPaddingPx = 60
-        EventStyleConfig.verticalPaddingPx = 6
-    }
+    // Calendar configuration - removed EventStyleConfig as it doesn't exist
+    // LaunchedEffect(Unit) {
+    //     // Event style configuration would go here
+    // }
 
     // State for event creation dialog
     var showEventDialog by remember { mutableStateOf(false) }
@@ -516,7 +510,13 @@ fun HomePage() {
                         CalendarCell(
                             date = cellDate,
                             hour = actualHour,
-                            events = events,
+                            events = events.filter { event ->
+                                // Only show events that match this specific date and hour
+                                event.startTime.getFullYear() == cellDate.getFullYear() &&
+                                event.startTime.getMonth() == cellDate.getMonth() &&
+                                event.startTime.getDate() == cellDate.getDate() &&
+                                event.startTime.getHours() == actualHour
+                            },
                             allEvents = events, // Pass full events list for drop operations
                             onEventClick = { event ->
                                 // Event click handled in CalendarCell

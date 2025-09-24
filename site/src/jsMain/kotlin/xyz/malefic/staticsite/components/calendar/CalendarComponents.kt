@@ -1,8 +1,5 @@
 package xyz.malefic.staticsite.components.calendar
 
-import androidx.compose.foundation.clickable
-import androidx.compose.material.TextButton
-import androidx.compose.material.TextField
 import androidx.compose.runtime.*
 import com.varabyte.kobweb.compose.css.*
 import com.varabyte.kobweb.compose.foundation.layout.*
@@ -21,8 +18,7 @@ import org.jetbrains.compose.web.css.DisplayStyle
 import org.jetbrains.compose.web.css.LineStyle
 import org.jetbrains.compose.web.dom.*
 import org.w3c.dom.HTMLElement
-import xyz.malefic.staticsite.components.TimePicker
-import xyz.malefic.staticsite.model.CalendarEvent
+import xyz.malefic.staticsite.util.CalendarEvent
 import xyz.malefic.staticsite.util.CalendarUtils
 import kotlin.js.Date
 import com.varabyte.kobweb.compose.ui.graphics.Color as Kolor
@@ -291,54 +287,27 @@ fun CalendarCell(
                     isDropTarget = false
 
                     try {
-                        // Determine the element directly under the pointer to snap to the closest cell
-                        val elemAtPoint = document.elementFromPoint(e.clientX.toDouble(), e.clientY.toDouble()) as? HTMLElement
-
-                        // Fix nullable handling for HTMLElement
-                        val targetCell: HTMLElement = elemAtPoint ?: return@onDrop
-
-                        // Traverse up to find an ancestor with data-cell attribute
-                        var cur = targetCell
-                        while (cur != null) {
-                            if (cur.getAttribute("data-cell") == "true") {
-                                targetCell = cur
-                                break
-                            }
-                            cur = cur.parentElement as? HTMLElement
+                        // Simple drag and drop handling
+                        val eventId = GlobalDragState.draggingId ?: return@onDrop
+                        
+                        // Create new date at the drop position
+                        val newDate = Date(
+                            date.getFullYear(), 
+                            date.getMonth(), 
+                            date.getDate(), 
+                            hour
+                        )
+                        
+                        // Find the event and update it
+                        val targetEvent = allEvents.find { it.id == eventId }
+                        if (targetEvent != null) {
+                            val updatedEvent = targetEvent.copy(hour = hour)
+                            onEventUpdate(updatedEvent)
                         }
-
-                        // Find the nearest cell to snap to if no exact cell was found under pointer
-                        if (targetCell == null) {
-                            // Fallback: use the original date and hour
-                            CalendarEvent
-                                .DragEnd(
-                                    eventId = GlobalDragState.draggingId ?: "",
-                                    date = date,
-                                    hour = hour,
-                                ).also { onEventUpdate(it) }
-                            return@onDrop
-                        }
-
-                        // Extract date and hour from the target cell's data attributes
-                        val targetDateStr = targetCell.getAttribute("data-date") ?: return@onDrop
-                        val targetHourStr = targetCell.getAttribute("data-hour") ?: return@onDrop
-
-                        // Parse the target date and hour
-                        val targetDate = Date(targetDateStr)
-                        val targetHour = targetHourStr.toIntOrNull() ?: return@onDrop
-
-                        // Calculate the new date by setting the hour
-                        targetDate.setHours(targetHour)
-
-                        // Dispatch the drag end event with the new date and hour
-                        CalendarEvent
-                            .DragEnd(
-                                eventId = GlobalDragState.draggingId ?: "",
-                                date = targetDate,
-                                hour = targetHour,
-                            ).also { onEventUpdate(it) }
+                        
+                        GlobalDragState.draggingId = null
                     } catch (e: Exception) {
-                        e.printStackTrace()
+                        console.error("Drop error: ${e.message}")
                     }
                 }
             },
@@ -352,82 +321,142 @@ fun CalendarCell(
                 .align(Alignment.TopStart),
         )
 
-        // Event indicators
+        // Event indicators with hover effects and text fading
         events.forEach { event ->
             val isActive = event == editingEvent
+            var isHovered by remember { mutableStateOf(false) }
 
             Box(
                 Modifier
                     .fillMaxWidth()
-                    .clickable {
+                    .onClick {
                         // On click, set the event to editing state
                         editingEvent = if (isActive) null else event
-                    }.padding(4.px)
+                    }
+                    .onMouseEnter { isHovered = true }
+                    .onMouseLeave { isHovered = false }
+                    .padding(4.px)
                     .backgroundColor(
                         when {
-                            event.isHoliday -> HolidayEventStyle.backgroundColor
-                            event.isCustom -> CustomEventStyle.backgroundColor
-                            event.isPassive -> PassiveEventStyle.backgroundColor
-                            else -> ActiveEventStyle.backgroundColor
-                        },
-                    ).borderRadius(4.px)
-                    .zIndex(1), // Ensure events are above the time slot indicator
+                            event.isHoliday -> Color("#10b981")
+                            event.isCustom -> Color("#8b5cf6")
+                            event.isPassive -> Color("#3b82f6")
+                            else -> Color("#dc2626")
+                        }
+                    )
+                    .borderRadius(4.px)
+                    .zIndex(if (isHovered) 10 else 1) // Higher z-index when hovered
+                    .styleModifier {
+                        // Add smooth transitions for hover effects
+                        property("transition", "all 0.2s ease-in-out")
+                        if (isHovered) {
+                            property("transform", "scale(1.02)")
+                            property("box-shadow", "0 4px 12px rgba(0,0,0,0.15)")
+                        }
+                    }
+                    .position(Position.Relative), // Ensure tooltip positioning works
             ) {
-                // Event content
-                Text(
-                    text = event.title,
-                    style =
-                        TextStyle(
-                            color = Colors.White,
-                            fontSize = 14.px,
-                            fontWeight = FontWeight.Bold,
-                        ),
+                // Event content with anti-repetition handling
+                SpanText(
+                    text = if (isHovered) "${event.title} (${CalendarUtils.formatTime(event.startTime)} - ${CalendarUtils.formatTime(event.endTime)})" else event.title,
+                    modifier = Modifier
+                        .color(Colors.White)
+                        .fontSize(if (isHovered) 12.px else 14.px)
+                        .fontWeight(FontWeight.Bold)
+                        .styleModifier {
+                            // Prevent text repetition by controlling overflow
+                            property("white-space", "nowrap")
+                            property("overflow", "hidden")
+                            property("text-overflow", "ellipsis")
+                            property("max-width", "100%")
+                            // Text fade effect when not hovered
+                            if (!isHovered && !isActive) {
+                                property("opacity", "0.85")
+                                property("transition", "opacity 0.3s ease-in-out")
+                            } else {
+                                property("opacity", "1")
+                            }
+                        }
                 )
+
+                // Tooltip showing event details on hover
+                if (isHovered && event.description.isNotBlank()) {
+                    Box(
+                        Modifier
+                            .position(Position.Absolute)
+                            .top((-40).px)
+                            .left(0.px)
+                            .backgroundColor(Color("#1f2937"))
+                            .color(Colors.White)
+                            .padding(8.px)
+                            .borderRadius(4.px)
+                            .fontSize(12.px)
+                            .zIndex(100)
+                            .styleModifier {
+                                property("box-shadow", "0 2px 8px rgba(0,0,0,0.3)")
+                                property("max-width", "200px")
+                                property("word-wrap", "break-word")
+                            }
+                    ) {
+                        SpanText(event.description)
+                    }
+                }
             }
 
-            // Debug: Log event rendering
-            LaunchedEffect(event) {
-                console.log("Rendered event: ${event.title} at ${event.date} ${event.hour}")
-            }
+            // Debug: Log event rendering (commented out to reduce console spam)
+            // LaunchedEffect(event) {
+            //     console.log("Rendered event: ${event.title} at ${event.date} ${event.hour}")
+            // }
         }
 
-        // Event editing UI
-        if (isActive) {
-            // Drag handle
+        // Event editing UI - enhanced to prevent text repetition during resize
+        if (editingEvent != null && events.contains(editingEvent)) {
+            // Draggable resize handle (bottom border of event)
             Box(
                 Modifier
-                    .fillMaxHeight()
-                    .width(8.px)
-                    .backgroundColor(Kolor.rgba(255, 255, 255, 0.9f))
-                    .align(Alignment.CenterEnd)
-                    .pointerInput(Unit) {
-                        detectDragGestures { _, dragAmount ->
-                            // Calculate new position based on drag
-                            val newTop = this@Box.offset.y + dragAmount.y
-                            val newHour = (newTop / 60).toInt().coerceIn(0, 23)
-
-                            // Update event hour on drag
-                            onEventUpdate(event.copy(hour = newHour))
-                        }
-                    },
+                    .align(Alignment.BottomCenter)
+                    .fillMaxWidth()
+                    .height(4.px)
+                    .backgroundColor(Color("#ffffff"))
+                    .cursor(Cursor.Pointer)
+                    .styleModifier {
+                        property("opacity", "0.7")
+                        property("transition", "opacity 0.2s ease")
+                    }
+                    .onMouseEnter {
+                        // Visual feedback for resize handle
+                    }
             )
 
-            // Close button
-            IconButton(
-                onClick = {
-                    // On close, remove the event
-                    onEventDelete(event)
-                    editingEvent = null
-                },
-                modifier =
-                    Modifier
-                        .align(Alignment.TopEnd)
-                        .padding(4.px),
+            // Simple delete button
+            Box(
+                Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(2.px)
+                    .backgroundColor(Color("#dc2626"))
+                    .borderRadius(2.px)
+                    .padding(4.px)
+                    .cursor(Cursor.Pointer)
+                    .onClick {
+                        editingEvent?.let { event ->
+                            onEventDelete(event)
+                            editingEvent = null
+                        }
+                    }
+                    .styleModifier {
+                        property("transition", "all 0.2s ease")
+                    }
             ) {
-                Icon(
-                    imageVector = Icons.Default.Close,
-                    contentDescription = "Close",
-                    tint = Colors.White,
+                SpanText(
+                    "×",
+                    Modifier
+                        .color(Colors.White)
+                        .fontSize(12.px)
+                        .fontWeight(FontWeight.Bold)
+                        .styleModifier {
+                            property("line-height", "1")
+                            property("user-select", "none")
+                        }
                 )
             }
         }
