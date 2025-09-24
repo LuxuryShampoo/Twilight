@@ -9,6 +9,7 @@ import com.varabyte.kobweb.compose.ui.modifiers.*
 import com.varabyte.kobweb.core.Page
 import com.varabyte.kobweb.silk.components.text.SpanText
 import com.varabyte.kobweb.silk.style.toModifier
+import kotlinx.browser.localStorage
 import org.jetbrains.compose.web.css.*
 import org.jetbrains.compose.web.dom.*
 import org.w3c.dom.HTMLElement
@@ -23,8 +24,8 @@ import kotlin.js.Date
 @Composable
 fun HomePage() {
     // Load saved settings from localStorage
-    val savedTitle = js("localStorage.getItem('calendarTitle') || 'Twilight Calendar'") as String
-    val savedThemeJson = js("localStorage.getItem('calendarTheme')") as? String
+    val savedTitle = localStorage.getItem("calendarTheme") ?: "Twilight Calendar"
+    val savedThemeJson = localStorage.getItem("calendarTheme")
 
     // Default colors
     var primaryColor = "#9c27b0" // Deep Purple
@@ -510,13 +511,14 @@ fun HomePage() {
                         CalendarCell(
                             date = cellDate,
                             hour = actualHour,
-                            events = events.filter { event ->
-                                // Only show events that match this specific date and hour
-                                event.startTime.getFullYear() == cellDate.getFullYear() &&
-                                event.startTime.getMonth() == cellDate.getMonth() &&
-                                event.startTime.getDate() == cellDate.getDate() &&
-                                event.startTime.getHours() == actualHour
-                            },
+                            events =
+                                events.filter { event ->
+                                    // Only show events that match this specific date and hour
+                                    event.startTime.getFullYear() == cellDate.getFullYear() &&
+                                        event.startTime.getMonth() == cellDate.getMonth() &&
+                                        event.startTime.getDate() == cellDate.getDate() &&
+                                        event.startTime.getHours() == actualHour
+                                },
                             allEvents = events, // Pass full events list for drop operations
                             onEventClick = { event ->
                                 // Event click handled in CalendarCell
