@@ -510,7 +510,13 @@ fun HomePage() {
                         CalendarCell(
                             date = cellDate,
                             hour = actualHour,
-                            events = events,
+                            events = events.filter { event ->
+                                // Only show events that match this specific date and hour
+                                event.startTime.getFullYear() == cellDate.getFullYear() &&
+                                event.startTime.getMonth() == cellDate.getMonth() &&
+                                event.startTime.getDate() == cellDate.getDate() &&
+                                event.startTime.getHours() == actualHour
+                            },
                             allEvents = events, // Pass full events list for drop operations
                             onEventClick = { event ->
                                 // Event click handled in CalendarCell

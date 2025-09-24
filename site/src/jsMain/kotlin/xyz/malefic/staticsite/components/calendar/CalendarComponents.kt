@@ -321,9 +321,10 @@ fun CalendarCell(
                 .align(Alignment.TopStart),
         )
 
-        // Event indicators
+        // Event indicators with hover effects and text fading
         events.forEach { event ->
             val isActive = event == editingEvent
+            var isHovered by remember { mutableStateOf(false) }
 
             Box(
                 Modifier
@@ -331,7 +332,10 @@ fun CalendarCell(
                     .onClick {
                         // On click, set the event to editing state
                         editingEvent = if (isActive) null else event
-                    }.padding(4.px)
+                    }
+                    .onMouseEnter { isHovered = true }
+                    .onMouseLeave { isHovered = false }
+                    .padding(4.px)
                     .backgroundColor(
                         when {
                             event.isHoliday -> Color("#10b981")
@@ -339,48 +343,120 @@ fun CalendarCell(
                             event.isPassive -> Color("#3b82f6")
                             else -> Color("#dc2626")
                         }
-                    ).borderRadius(4.px)
-                    .zIndex(1), // Ensure events are above the time slot indicator
+                    )
+                    .borderRadius(4.px)
+                    .zIndex(if (isHovered) 10 else 1) // Higher z-index when hovered
+                    .styleModifier {
+                        // Add smooth transitions for hover effects
+                        property("transition", "all 0.2s ease-in-out")
+                        if (isHovered) {
+                            property("transform", "scale(1.02)")
+                            property("box-shadow", "0 4px 12px rgba(0,0,0,0.15)")
+                        }
+                    }
+                    .position(Position.Relative), // Ensure tooltip positioning works
             ) {
-                // Event content
+                // Event content with anti-repetition handling
                 SpanText(
-                    text = event.title,
+                    text = if (isHovered) "${event.title} (${CalendarUtils.formatTime(event.startTime)} - ${CalendarUtils.formatTime(event.endTime)})" else event.title,
                     modifier = Modifier
                         .color(Colors.White)
-                        .fontSize(14.px)
+                        .fontSize(if (isHovered) 12.px else 14.px)
                         .fontWeight(FontWeight.Bold)
+                        .styleModifier {
+                            // Prevent text repetition by controlling overflow
+                            property("white-space", "nowrap")
+                            property("overflow", "hidden")
+                            property("text-overflow", "ellipsis")
+                            property("max-width", "100%")
+                            // Text fade effect when not hovered
+                            if (!isHovered && !isActive) {
+                                property("opacity", "0.85")
+                                property("transition", "opacity 0.3s ease-in-out")
+                            } else {
+                                property("opacity", "1")
+                            }
+                        }
                 )
+
+                // Tooltip showing event details on hover
+                if (isHovered && event.description.isNotBlank()) {
+                    Box(
+                        Modifier
+                            .position(Position.Absolute)
+                            .top((-40).px)
+                            .left(0.px)
+                            .backgroundColor(Color("#1f2937"))
+                            .color(Colors.White)
+                            .padding(8.px)
+                            .borderRadius(4.px)
+                            .fontSize(12.px)
+                            .zIndex(100)
+                            .styleModifier {
+                                property("box-shadow", "0 2px 8px rgba(0,0,0,0.3)")
+                                property("max-width", "200px")
+                                property("word-wrap", "break-word")
+                            }
+                    ) {
+                        SpanText(event.description)
+                    }
+                }
             }
 
-            // Debug: Log event rendering
-            LaunchedEffect(event) {
-                console.log("Rendered event: ${event.title} at ${event.date} ${event.hour}")
-            }
+            // Debug: Log event rendering (commented out to reduce console spam)
+            // LaunchedEffect(event) {
+            //     console.log("Rendered event: ${event.title} at ${event.date} ${event.hour}")
+            // }
         }
 
-        // Event editing UI - simplified without drag gestures
+        // Event editing UI - enhanced to prevent text repetition during resize
         if (editingEvent != null && events.contains(editingEvent)) {
+            // Draggable resize handle (bottom border of event)
+            Box(
+                Modifier
+                    .align(Alignment.BottomCenter)
+                    .fillMaxWidth()
+                    .height(4.px)
+                    .backgroundColor(Color("#ffffff"))
+                    .cursor(Cursor.Pointer)
+                    .styleModifier {
+                        property("opacity", "0.7")
+                        property("transition", "opacity 0.2s ease")
+                    }
+                    .onMouseEnter {
+                        // Visual feedback for resize handle
+                    }
+            )
+
             // Simple delete button
             Box(
                 Modifier
                     .align(Alignment.TopEnd)
-                    .padding(4.px)
+                    .padding(2.px)
                     .backgroundColor(Color("#dc2626"))
-                    .borderRadius(4.px)
+                    .borderRadius(2.px)
                     .padding(4.px)
+                    .cursor(Cursor.Pointer)
                     .onClick {
                         editingEvent?.let { event ->
                             onEventDelete(event)
                             editingEvent = null
                         }
                     }
+                    .styleModifier {
+                        property("transition", "all 0.2s ease")
+                    }
             ) {
                 SpanText(
                     "×",
                     Modifier
                         .color(Colors.White)
-                        .fontSize(14.px)
+                        .fontSize(12.px)
                         .fontWeight(FontWeight.Bold)
+                        .styleModifier {
+                            property("line-height", "1")
+                            property("user-select", "none")
+                        }
                 )
             }
         }
