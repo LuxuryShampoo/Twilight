@@ -12,8 +12,11 @@ import com.varabyte.kobweb.silk.style.toModifier
 import org.jetbrains.compose.web.css.*
 import org.jetbrains.compose.web.dom.*
 import org.w3c.dom.HTMLElement
-import xyz.malefic.staticsite.components.calendar.*
+import xyz.malefic.staticsite.components.calendar.CalendarCell
+import xyz.malefic.staticsite.components.calendar.EventStyleConfig
 import xyz.malefic.staticsite.util.*
+import xyz.malefic.staticsite.util.CalendarEvent
+import xyz.malefic.staticsite.util.EventMode
 import kotlin.js.Date
 
 @Page
@@ -66,6 +69,17 @@ fun HomePage() {
                 add(testEvent)
             }
         }
+
+    // Initialize event visual style configuration once when the page loads
+    LaunchedEffect(Unit) {
+        EventStyleConfig.eventWidthPercent = 92.0
+        EventStyleConfig.minVisualHeightPx = 40
+        EventStyleConfig.heightScale = 1.1
+        EventStyleConfig.defaultBackground = "#00b6ae"
+        EventStyleConfig.borderRadiusPx = 8
+        EventStyleConfig.horizontalPaddingPx = 60
+        EventStyleConfig.verticalPaddingPx = 6
+    }
 
     // State for event creation dialog
     var showEventDialog by remember { mutableStateOf(false) }
@@ -511,6 +525,12 @@ fun HomePage() {
                                 val index = events.indexOfFirst { it.id == updatedEvent.id }
                                 if (index >= 0) {
                                     events[index] = updatedEvent
+                                }
+                            },
+                            onEventDelete = { deletedEvent ->
+                                val index = events.indexOfFirst { it.id == deletedEvent.id }
+                                if (index >= 0) {
+                                    events.removeAt(index)
                                 }
                             },
                         )
