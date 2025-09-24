@@ -1,8 +1,5 @@
 package xyz.malefic.staticsite.components.calendar
 
-import androidx.compose.foundation.clickable
-import androidx.compose.material.TextButton
-import androidx.compose.material.TextField
 import androidx.compose.runtime.*
 import com.varabyte.kobweb.compose.css.*
 import com.varabyte.kobweb.compose.foundation.layout.*
@@ -21,8 +18,7 @@ import org.jetbrains.compose.web.css.DisplayStyle
 import org.jetbrains.compose.web.css.LineStyle
 import org.jetbrains.compose.web.dom.*
 import org.w3c.dom.HTMLElement
-import xyz.malefic.staticsite.components.TimePicker
-import xyz.malefic.staticsite.model.CalendarEvent
+import xyz.malefic.staticsite.util.CalendarEvent
 import xyz.malefic.staticsite.util.CalendarUtils
 import kotlin.js.Date
 import com.varabyte.kobweb.compose.ui.graphics.Color as Kolor
@@ -291,54 +287,27 @@ fun CalendarCell(
                     isDropTarget = false
 
                     try {
-                        // Determine the element directly under the pointer to snap to the closest cell
-                        val elemAtPoint = document.elementFromPoint(e.clientX.toDouble(), e.clientY.toDouble()) as? HTMLElement
-
-                        // Fix nullable handling for HTMLElement
-                        val targetCell: HTMLElement = elemAtPoint ?: return@onDrop
-
-                        // Traverse up to find an ancestor with data-cell attribute
-                        var cur = targetCell
-                        while (cur != null) {
-                            if (cur.getAttribute("data-cell") == "true") {
-                                targetCell = cur
-                                break
-                            }
-                            cur = cur.parentElement as? HTMLElement
+                        // Simple drag and drop handling
+                        val eventId = GlobalDragState.draggingId ?: return@onDrop
+                        
+                        // Create new date at the drop position
+                        val newDate = Date(
+                            date.getFullYear(), 
+                            date.getMonth(), 
+                            date.getDate(), 
+                            hour
+                        )
+                        
+                        // Find the event and update it
+                        val targetEvent = allEvents.find { it.id == eventId }
+                        if (targetEvent != null) {
+                            val updatedEvent = targetEvent.copy(hour = hour)
+                            onEventUpdate(updatedEvent)
                         }
-
-                        // Find the nearest cell to snap to if no exact cell was found under pointer
-                        if (targetCell == null) {
-                            // Fallback: use the original date and hour
-                            CalendarEvent
-                                .DragEnd(
-                                    eventId = GlobalDragState.draggingId ?: "",
-                                    date = date,
-                                    hour = hour,
-                                ).also { onEventUpdate(it) }
-                            return@onDrop
-                        }
-
-                        // Extract date and hour from the target cell's data attributes
-                        val targetDateStr = targetCell.getAttribute("data-date") ?: return@onDrop
-                        val targetHourStr = targetCell.getAttribute("data-hour") ?: return@onDrop
-
-                        // Parse the target date and hour
-                        val targetDate = Date(targetDateStr)
-                        val targetHour = targetHourStr.toIntOrNull() ?: return@onDrop
-
-                        // Calculate the new date by setting the hour
-                        targetDate.setHours(targetHour)
-
-                        // Dispatch the drag end event with the new date and hour
-                        CalendarEvent
-                            .DragEnd(
-                                eventId = GlobalDragState.draggingId ?: "",
-                                date = targetDate,
-                                hour = targetHour,
-                            ).also { onEventUpdate(it) }
+                        
+                        GlobalDragState.draggingId = null
                     } catch (e: Exception) {
-                        e.printStackTrace()
+                        console.error("Drop error: ${e.message}")
                     }
                 }
             },
@@ -359,29 +328,27 @@ fun CalendarCell(
             Box(
                 Modifier
                     .fillMaxWidth()
-                    .clickable {
+                    .onClick {
                         // On click, set the event to editing state
                         editingEvent = if (isActive) null else event
                     }.padding(4.px)
                     .backgroundColor(
                         when {
-                            event.isHoliday -> HolidayEventStyle.backgroundColor
-                            event.isCustom -> CustomEventStyle.backgroundColor
-                            event.isPassive -> PassiveEventStyle.backgroundColor
-                            else -> ActiveEventStyle.backgroundColor
-                        },
+                            event.isHoliday -> Color("#10b981")
+                            event.isCustom -> Color("#8b5cf6")
+                            event.isPassive -> Color("#3b82f6")
+                            else -> Color("#dc2626")
+                        }
                     ).borderRadius(4.px)
                     .zIndex(1), // Ensure events are above the time slot indicator
             ) {
                 // Event content
-                Text(
+                SpanText(
                     text = event.title,
-                    style =
-                        TextStyle(
-                            color = Colors.White,
-                            fontSize = 14.px,
-                            fontWeight = FontWeight.Bold,
-                        ),
+                    modifier = Modifier
+                        .color(Colors.White)
+                        .fontSize(14.px)
+                        .fontWeight(FontWeight.Bold)
                 )
             }
 
@@ -391,43 +358,29 @@ fun CalendarCell(
             }
         }
 
-        // Event editing UI
-        if (isActive) {
-            // Drag handle
+        // Event editing UI - simplified without drag gestures
+        if (editingEvent != null && events.contains(editingEvent)) {
+            // Simple delete button
             Box(
                 Modifier
-                    .fillMaxHeight()
-                    .width(8.px)
-                    .backgroundColor(Kolor.rgba(255, 255, 255, 0.9f))
-                    .align(Alignment.CenterEnd)
-                    .pointerInput(Unit) {
-                        detectDragGestures { _, dragAmount ->
-                            // Calculate new position based on drag
-                            val newTop = this@Box.offset.y + dragAmount.y
-                            val newHour = (newTop / 60).toInt().coerceIn(0, 23)
-
-                            // Update event hour on drag
-                            onEventUpdate(event.copy(hour = newHour))
+                    .align(Alignment.TopEnd)
+                    .padding(4.px)
+                    .backgroundColor(Color("#dc2626"))
+                    .borderRadius(4.px)
+                    .padding(4.px)
+                    .onClick {
+                        editingEvent?.let { event ->
+                            onEventDelete(event)
+                            editingEvent = null
                         }
-                    },
-            )
-
-            // Close button
-            IconButton(
-                onClick = {
-                    // On close, remove the event
-                    onEventDelete(event)
-                    editingEvent = null
-                },
-                modifier =
-                    Modifier
-                        .align(Alignment.TopEnd)
-                        .padding(4.px),
+                    }
             ) {
-                Icon(
-                    imageVector = Icons.Default.Close,
-                    contentDescription = "Close",
-                    tint = Colors.White,
+                SpanText(
+                    "×",
+                    Modifier
+                        .color(Colors.White)
+                        .fontSize(14.px)
+                        .fontWeight(FontWeight.Bold)
                 )
             }
         }

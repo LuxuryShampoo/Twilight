@@ -55,6 +55,10 @@ data class CalendarTheme(
  * @property recurrenceEndDate The end date of recurrence if the event is recurring
  * @property color Optional color for the event
  * @property isHoliday Whether the event is a holiday
+ * @property isCustom Whether the event is custom
+ * @property isPassive Whether the event is passive (computed property)
+ * @property date The date of the event (computed property)
+ * @property hour The hour of the event (computed property)
  */
 @Stable
 data class CalendarEvent(
@@ -68,8 +72,58 @@ data class CalendarEvent(
     var recurrenceFrequency: RecurrenceFrequency? = null,
     var recurrenceEndDate: Date? = null,
     var color: String? = null,
-    var isHoliday: Boolean = false
-)
+    var isHoliday: Boolean = false,
+    var isCustom: Boolean = false
+) {
+    /**
+     * Computed property to check if the event is passive
+     */
+    val isPassive: Boolean
+        get() = mode == EventMode.PASSIVE
+
+    /**
+     * Computed property to get the date of the event
+     */
+    val date: Date
+        get() = startTime
+
+    /**
+     * Computed property to get the hour of the event
+     */
+    val hour: Int
+        get() = startTime.getHours()
+
+    /**
+     * Creates a copy of the event with the specified hour
+     */
+    fun copy(hour: Int): CalendarEvent {
+        val newStartTime = Date(
+            startTime.getFullYear(),
+            startTime.getMonth(),
+            startTime.getDate(),
+            hour
+        )
+        val newEndTime = Date(
+            endTime.getFullYear(),
+            endTime.getMonth(),
+            endTime.getDate(),
+            hour + 1
+        )
+        
+        return copy(startTime = newStartTime, endTime = newEndTime)
+    }
+
+    companion object {
+        /**
+         * Represents a drag end event for updating event position
+         */
+        data class DragEnd(
+            val eventId: String,
+            val date: Date,
+            val hour: Int
+        )
+    }
+}
 
 /**
  * Represents a calendar.
