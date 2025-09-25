@@ -1777,6 +1777,8 @@ fun HomePage() {
                 }
             },
             onAutoSort = { autoSortedEvents ->
+                // Clear existing FREE events from the calendar
+                events.removeAll { it.title == "FREE" }
                 // Add the auto-sorted events to the calendar
                 events.addAll(autoSortedEvents)
                 // Clear all tasks after auto-sorting them to calendar
