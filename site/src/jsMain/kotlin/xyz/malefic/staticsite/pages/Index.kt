@@ -23,11 +23,108 @@ import xyz.malefic.staticsite.util.EventMode
 import xyz.malefic.staticsite.util.ThemeManager
 import kotlin.js.Date
 
+/**
+ * Creates the default weekly schedule with passive events
+ */
+fun createDefaultWeeklySchedule(): List<CalendarEvent> {
+    val events = mutableListOf<CalendarEvent>()
+    val now = Date()
+    
+    // Get the start of the current week (Monday)
+    val currentDayOfWeek = (now.getDay() + 6) % 7 // Convert Sunday=0 to Monday=0 system
+    val mondayDate = Date(now.getFullYear(), now.getMonth(), now.getDate() - currentDayOfWeek)
+    
+    // Helper function to create time from hours and minutes
+    fun createTime(day: Int, hour: Int, minute: Int): Date {
+        return Date(mondayDate.getFullYear(), mondayDate.getMonth(), mondayDate.getDate() + day, hour, minute)
+    }
+    
+    // Helper function to add event
+    fun addEvent(day: Int, startHour: Int, startMin: Int, endHour: Int, endMin: Int, title: String) {
+        val id = "schedule-${day}-${startHour}-${startMin}-${title.replace(" ", "-").replace("/", "-")}"
+        events.add(CalendarEvent(
+            id = id,
+            title = title,
+            description = "Scheduled time block",
+            startTime = createTime(day, startHour, startMin),
+            endTime = createTime(day, endHour, endMin),
+            mode = EventMode.PASSIVE
+        ))
+    }
+    
+    // Monday (day 0)
+    addEvent(0, 6, 10, 8, 30, "Trade")
+    addEvent(0, 8, 30, 9, 45, "FREE")
+    addEvent(0, 10, 0, 10, 34, "2")
+    addEvent(0, 10, 39, 11, 14, "3")
+    addEvent(0, 11, 18, 11, 53, "4")
+    addEvent(0, 11, 53, 12, 14, "FREE")
+    addEvent(0, 12, 14, 12, 45, "Lunch/Robotics Board Meeting")
+    addEvent(0, 12, 48, 13, 23, "5")
+    addEvent(0, 13, 23, 15, 20, "FREE")
+    addEvent(0, 15, 20, 17, 0, "Robotics")
+    addEvent(0, 17, 30, 22, 0, "FREE")
+    
+    // Tuesday (day 1)
+    addEvent(1, 6, 10, 8, 10, "Trade")
+    addEvent(1, 8, 30, 9, 55, "2")
+    addEvent(1, 10, 0, 11, 25, "4")
+    addEvent(1, 11, 30, 11, 50, "FREE")
+    addEvent(1, 11, 50, 12, 25, "Lunch")
+    addEvent(1, 12, 25, 15, 20, "FREE")
+    addEvent(1, 15, 20, 17, 0, "Robotics")
+    addEvent(1, 17, 30, 22, 0, "FREE")
+    
+    // Wednesday (day 2)
+    addEvent(2, 6, 10, 8, 10, "Trade")
+    addEvent(2, 8, 30, 9, 55, "FREE")
+    addEvent(2, 10, 0, 11, 25, "3")
+    addEvent(2, 11, 30, 11, 50, "FREE")
+    addEvent(2, 11, 50, 12, 20, "Lunch")
+    addEvent(2, 12, 25, 13, 50, "5")
+    addEvent(2, 13, 50, 15, 20, "FREE")
+    addEvent(2, 15, 20, 17, 0, "Robotics")
+    addEvent(2, 16, 30, 17, 30, "1")
+    addEvent(2, 17, 30, 20, 0, "FREE")
+    addEvent(2, 20, 0, 21, 0, "7")
+    addEvent(2, 21, 0, 22, 0, "FREE")
+    
+    // Thursday (day 3)
+    addEvent(3, 6, 10, 8, 10, "Trade")
+    addEvent(3, 8, 30, 9, 55, "2")
+    addEvent(3, 10, 0, 11, 25, "4")
+    addEvent(3, 11, 30, 11, 50, "FREE")
+    addEvent(3, 11, 50, 12, 25, "Lunch/SkillsUSA Meeting")
+    addEvent(3, 12, 25, 15, 20, "FREE")
+    addEvent(3, 15, 20, 17, 0, "Robotics")
+    addEvent(3, 17, 30, 22, 0, "FREE")
+    
+    // Friday (day 4)
+    addEvent(4, 6, 10, 8, 10, "Trade")
+    addEvent(4, 8, 30, 9, 55, "FREE")
+    addEvent(4, 10, 0, 11, 25, "3")
+    addEvent(4, 11, 30, 11, 50, "FREE")
+    addEvent(4, 11, 50, 12, 20, "Lunch")
+    addEvent(4, 12, 25, 13, 50, "5")
+    addEvent(4, 13, 50, 15, 20, "FREE")
+    addEvent(4, 15, 20, 17, 0, "Robotics")
+    addEvent(4, 17, 30, 22, 0, "FREE")
+    
+    // Saturday (day 5)
+    addEvent(5, 8, 0, 12, 0, "Robotics")
+    addEvent(5, 12, 0, 22, 0, "FREE/Busy")
+    
+    // Sunday (day 6)
+    addEvent(6, 8, 0, 22, 0, "FREE/Busy")
+    
+    return events
+}
+
 @Page
 @Composable
 fun HomePage() {
     // Load saved settings from localStorage
-    val savedTitle = localStorage.getItem("calendarTheme") ?: "Twilight Calendar"
+    val savedTitle = localStorage.getItem("calendarTitle") ?: "Twilight Calendar"
     val savedThemeJson = localStorage.getItem("calendarTheme")
 
     // Default colors
@@ -59,18 +156,8 @@ fun HomePage() {
     val events =
         remember {
             mutableStateListOf<CalendarEvent>().apply {
-                // Add a test event for debugging
-                val now = Date()
-                val testEvent =
-                    CalendarEvent(
-                        id = "test-event-1",
-                        title = "Test Event",
-                        description = "This is a test event",
-                        startTime = Date(now.getFullYear(), now.getMonth(), now.getDate(), 9), // 9 AM
-                        endTime = Date(now.getFullYear(), now.getMonth(), now.getDate(), 10), // 10 AM
-                        mode = EventMode.PASSIVE,
-                    )
-                add(testEvent)
+                // Add default weekly schedule as passive events
+                addAll(createDefaultWeeklySchedule())
             }
         }
 
