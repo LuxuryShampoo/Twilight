@@ -420,7 +420,7 @@ fun HomePage() {
                 },
             ) {
                 Tr {
-                    // Month and Year
+                    // Week Range Display
                     Td(
                         attrs = {
                             style {
@@ -428,6 +428,26 @@ fun HomePage() {
                             }
                         },
                     ) {
+                        // Calculate the Sunday-Saturday range for the current week
+                        val currentDayOfWeek = displayDate.getDay() // 0 = Sunday, 1 = Monday, ..., 6 = Saturday
+                        val sundayTime = displayDate.getTime() - (currentDayOfWeek * 24 * 60 * 60 * 1000)
+                        val saturdayTime = sundayTime + (6 * 24 * 60 * 60 * 1000)
+                        
+                        val sundayDate = Date(sundayTime)
+                        val saturdayDate = Date(saturdayTime)
+                        
+                        val startMonth = monthNames[sundayDate.getMonth()]
+                        val endMonth = monthNames[saturdayDate.getMonth()]
+                        val startDay = sundayDate.getDate()
+                        val endDay = saturdayDate.getDate()
+                        val year = sundayDate.getFullYear()
+                        
+                        val weekRangeText = if (startMonth == endMonth) {
+                            "$startMonth $startDay - $endDay, $year"
+                        } else {
+                            "$startMonth $startDay - $endMonth $endDay, $year"
+                        }
+                        
                         H2(
                             attrs = {
                                 style {
@@ -436,7 +456,7 @@ fun HomePage() {
                                 }
                             },
                         ) {
-                            Text("$currentMonth $currentYear")
+                            Text(weekRangeText)
                         }
                     }
 
@@ -451,14 +471,9 @@ fun HomePage() {
                         Button(
                             attrs = {
                                 onClick {
-                                    // Go to previous month by creating a new Date with the previous month
-                                    val currentMonth = displayDate.getMonth()
-                                    val currentYear = displayDate.getFullYear()
-
-                                    val newMonth = if (currentMonth == 0) 11 else currentMonth - 1
-                                    val newYear = if (currentMonth == 0) currentYear - 1 else currentYear
-
-                                    displayDate = Date(newYear, newMonth, 1)
+                                    // Go to previous week by subtracting 7 days
+                                    val currentTime = displayDate.getTime()
+                                    displayDate = Date(currentTime - (7 * 24 * 60 * 60 * 1000))
                                 }
                                 style {
                                     padding(8.px, 16.px)
@@ -470,14 +485,17 @@ fun HomePage() {
                                 }
                             },
                         ) {
-                            Text("Previous Month")
+                            Text("Previous Week")
                         }
 
                         Button(
                             attrs = {
                                 onClick {
-                                    // Reset to current date
-                                    displayDate = Date()
+                                    // Go to current week (start of current week - Sunday)
+                                    val now = Date()
+                                    val dayOfWeek = now.getDay() // 0 = Sunday, 1 = Monday, ..., 6 = Saturday
+                                    val sundayTime = now.getTime() - (dayOfWeek * 24 * 60 * 60 * 1000)
+                                    displayDate = Date(sundayTime)
                                 }
                                 style {
                                     padding(8.px, 16.px)
@@ -489,20 +507,15 @@ fun HomePage() {
                                 }
                             },
                         ) {
-                            Text("Today")
+                            Text("This Week")
                         }
 
                         Button(
                             attrs = {
                                 onClick {
-                                    // Go to next month by creating a new Date with the next month
-                                    val currentMonth = displayDate.getMonth()
-                                    val currentYear = displayDate.getFullYear()
-
-                                    val newMonth = if (currentMonth == 11) 0 else currentMonth + 1
-                                    val newYear = if (currentMonth == 11) currentYear + 1 else currentYear
-
-                                    displayDate = Date(newYear, newMonth, 1)
+                                    // Go to next week by adding 7 days
+                                    val currentTime = displayDate.getTime()
+                                    displayDate = Date(currentTime + (7 * 24 * 60 * 60 * 1000))
                                 }
                                 style {
                                     padding(8.px, 16.px)
@@ -513,7 +526,7 @@ fun HomePage() {
                                 }
                             },
                         ) {
-                            Text("Next Month")
+                            Text("Next Week")
                         }
                     }
                 }
@@ -544,11 +557,14 @@ fun HomePage() {
                     },
             ) {}
 
-            // Day headers with day names and dates
+            // Day headers with day names and dates - Sunday to Saturday week view
             for (dayOffset in 0..6) {
-                val dayDate = Date(displayDate.getTime() + dayOffset * 24 * 60 * 60 * 1000)
+                // Calculate the Sunday of the week containing displayDate
+                val currentDayOfWeek = displayDate.getDay() // 0 = Sunday, 1 = Monday, ..., 6 = Saturday
+                val sundayTime = displayDate.getTime() - (currentDayOfWeek * 24 * 60 * 60 * 1000)
+                val dayDate = Date(sundayTime + dayOffset * 24 * 60 * 60 * 1000)
                 val dayNames = listOf("Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat")
-                val dayName = dayNames[dayDate.getDay()]
+                val dayName = dayNames[dayOffset] // dayOffset 0=Sunday, 1=Monday, etc.
 
                 Box(
                     Modifier
@@ -610,9 +626,12 @@ fun HomePage() {
                 }
             }
 
-            // Calendar cells (6 AM to 5 AM)
+            // Calendar cells (6 AM to 5 AM) - Sunday to Saturday week view
             for (dayOffset in 0..6) {
-                val dayDate = Date(displayDate.getTime() + dayOffset * 24 * 60 * 60 * 1000)
+                // Calculate the Sunday of the week containing displayDate
+                val currentDayOfWeek = displayDate.getDay() // 0 = Sunday, 1 = Monday, ..., 6 = Saturday
+                val sundayTime = displayDate.getTime() - (currentDayOfWeek * 24 * 60 * 60 * 1000)
+                val dayDate = Date(sundayTime + dayOffset * 24 * 60 * 60 * 1000)
 
                 for (hour in 0..23) {
                     val actualHour = (hour + 6) % 24 // Start from 6 AM
@@ -790,7 +809,11 @@ fun HomePage() {
                         Button(
                             attrs = {
                                 onClick { 
-                                    displayDate = Date()
+                                    // Go to current week (start of current week - Sunday)
+                                    val now = Date()
+                                    val dayOfWeek = now.getDay() // 0 = Sunday, 1 = Monday, ..., 6 = Saturday
+                                    val sundayTime = now.getTime() - (dayOfWeek * 24 * 60 * 60 * 1000)
+                                    displayDate = Date(sundayTime)
                                 }
                                 style {
                                     padding(8.px, 16.px)
@@ -803,7 +826,7 @@ fun HomePage() {
                                 }
                             },
                         ) {
-                            Text("Today")
+                            Text("This Week")
                         }
                     }
                 }
