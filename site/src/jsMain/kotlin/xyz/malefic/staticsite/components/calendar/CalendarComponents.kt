@@ -40,7 +40,7 @@ val CalendarGridStyle =
                 property("grid-template-columns", "auto repeat(7, 1fr)")
                 property("grid-template-rows", "auto repeat(24, 60px)")
                 property("gap", "1px")
-            }.border(1.px, LineStyle.Solid, Color("#e6e6e6"))
+            }.border(1.px, LineStyle.Solid, Color(ThemeManager.Colors.border))
             .borderRadius(8.px)
             .overflow(Overflow.Hidden)
             .boxShadow(0.px, 2.px, 10.px, color = Kolor.rgba(0f, 0f, 0f, 0.1f))
@@ -50,23 +50,24 @@ val CalendarGridStyle =
 val CalendarHeaderStyle =
     CssStyle.base {
         Modifier
-            .backgroundColor(Color("#f9fafb"))
+            .backgroundColor(Color(ThemeManager.Colors.headerBackground))
             .padding(12.px)
-            .borderBottom(1.px, LineStyle.Solid, Color("#e6e6e6"))
+            .borderBottom(1.px, LineStyle.Solid, Color(ThemeManager.Colors.border))
             .fontSize(14.px)
             .fontWeight(500)
             .textAlign(TextAlign.Center)
+            .color(Color(ThemeManager.Colors.text))
     }
 
 // Time Column Styles
 val TimeColumnStyle =
     CssStyle.base {
         Modifier
-            .backgroundColor(Color("#f9fafb"))
+            .backgroundColor(Color(ThemeManager.Colors.headerBackground))
             .padding(8.px)
-            .borderRight(1.px, LineStyle.Solid, Color("#e6e6e6"))
+            .borderRight(1.px, LineStyle.Solid, Color(ThemeManager.Colors.border))
             .fontSize(12.px)
-            .color(Color("#646464"))
+            .color(Color(ThemeManager.Colors.secondaryText))
             .textAlign(TextAlign.Right)
     }
 
@@ -74,8 +75,8 @@ val TimeColumnStyle =
 val CalendarCellStyle =
     CssStyle.base {
         Modifier
-            .backgroundColor(Colors.White)
-            .border(1.px, LineStyle.Solid, Color("#f0f0f0"))
+            .backgroundColor(Color(ThemeManager.Colors.calendarBackground))
+            .border(1.px, LineStyle.Solid, Color(ThemeManager.Colors.border))
             .minHeight(60.px)
             .position(Position.Relative)
             .overflow(Overflow.Visible) // Allow events to overflow when needed
@@ -159,11 +160,12 @@ val CalendarNavStyle =
 val NavButtonStyle =
     Modifier
         .padding(8.px, 12.px)
-        .backgroundColor(Color("#f9fafb"))
-        .border(1.px, LineStyle.Solid, Color("#e6e6e6"))
+        .backgroundColor(Color(ThemeManager.Colors.buttonBackground))
+        .border(1.px, LineStyle.Solid, Color(ThemeManager.Colors.border))
         .borderRadius(4.px)
         .cursor(Cursor.Pointer)
         .fontSize(14.px)
+        .color(Color(ThemeManager.Colors.buttonText))
         .transition(Transition.of("background-color", 0.2.s))
 
 val NavButtonHoverStyle =
@@ -173,7 +175,7 @@ val NavButtonHoverStyle =
         }
 
         hover {
-            Modifier.backgroundColor(Color("#f0f0f0"))
+            Modifier.backgroundColor(Color(if (ThemeManager.isDarkMode) "#4A4A4A" else "#f0f0f0"))
         }
     }
 
@@ -182,6 +184,7 @@ val TitleStyle =
         Modifier
             .fontSize(20.px)
             .fontWeight(700)
+            .color(Color(ThemeManager.Colors.text))
     }
 
 /**
