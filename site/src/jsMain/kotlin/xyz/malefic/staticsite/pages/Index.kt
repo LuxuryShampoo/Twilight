@@ -15,6 +15,7 @@ import org.jetbrains.compose.web.dom.*
 import org.jetbrains.compose.web.attributes.*
 import org.w3c.dom.HTMLElement
 import xyz.malefic.staticsite.components.calendar.CalendarCell
+import xyz.malefic.staticsite.components.calendar.GlobalSelectionState
 import xyz.malefic.staticsite.components.WeeklyTaskManager
 import xyz.malefic.staticsite.components.WeeklyTask
 import xyz.malefic.staticsite.components.TaskPriority
@@ -79,6 +80,41 @@ fun HomePage() {
     // State for weekly tasks
     val tasks = remember { mutableStateListOf<WeeklyTask>() }
 
+    // Undo/Redo state management
+    val deletedEvents = remember { mutableStateListOf<CalendarEvent>() }
+    
+    // Keyboard event handling for delete and undo
+    LaunchedEffect(Unit) {
+        val keyListener: (dynamic) -> Unit = { event ->
+            val keyEvent = event.unsafeCast<org.w3c.dom.events.KeyboardEvent>()
+            when {
+                keyEvent.key == "Delete" && GlobalSelectionState.selectedEventIds.isNotEmpty() -> {
+                    // Delete selected events
+                    val eventsToDelete = events.filter { GlobalSelectionState.selectedEventIds.contains(it.id) }
+                    eventsToDelete.forEach { event ->
+                        deletedEvents.add(event)
+                        events.remove(event)
+                    }
+                    GlobalSelectionState.clearSelection()
+                    keyEvent.preventDefault()
+                }
+                keyEvent.ctrlKey && keyEvent.key == "z" && deletedEvents.isNotEmpty() -> {
+                    // Undo - restore last deleted events
+                    val lastDeleted = deletedEvents.removeLastOrNull()
+                    lastDeleted?.let { events.add(it) }
+                    keyEvent.preventDefault()
+                }
+                keyEvent.key == "Escape" -> {
+                    // Clear selection on Escape
+                    GlobalSelectionState.clearSelection()
+                    keyEvent.preventDefault()
+                }
+            }
+        }
+        
+        kotlinx.browser.document.addEventListener("keydown", keyListener)
+    }
+
     // Calendar configuration - removed EventStyleConfig as it doesn't exist
     // LaunchedEffect(Unit) {
     //     // Event style configuration would go here
@@ -103,6 +139,13 @@ fun HomePage() {
     var isRecurring by remember { mutableStateOf(false) }
     var recurrenceFrequency by remember { mutableStateOf(RecurrenceFrequency.DAILY) }
     var customHours by remember { mutableStateOf(24) }
+
+    // State for event editing dialog
+    var showEditDialog by remember { mutableStateOf(false) }
+    var editingEvent by remember { mutableStateOf<CalendarEvent?>(null) }
+    var editEventTitle by remember { mutableStateOf("") }
+    var editEventDescription by remember { mutableStateOf("") }
+    var editEventMode by remember { mutableStateOf(EventMode.PASSIVE) }
 
     // Get month and year for display
     val monthNames =
@@ -507,9 +550,17 @@ fun HomePage() {
 
                                     // Create a new date at the drop position
                                     val newDate = Date(cellDate.getFullYear(), cellDate.getMonth(), cellDate.getDate(), actualHour)
-                                    val minutes = (offsetY * 60).toInt()
+                                    val rawMinutes = (offsetY * 60).toInt()
+                                    // Round to nearest half hour (0 or 30 minutes)
+                                    val minutes = if (rawMinutes < 15) 0 else if (rawMinutes < 45) 30 else 60
                                     // Use asDynamic() to access JavaScript methods
-                                    newDate.asDynamic().setMinutes(minutes)
+                                    if (minutes == 60) {
+                                        // If rounded to 60 minutes, move to next hour
+                                        newDate.asDynamic().setMinutes(0)
+                                        newDate.asDynamic().setHours(newDate.getHours() + 1)
+                                    } else {
+                                        newDate.asDynamic().setMinutes(minutes)
+                                    }
 
                                     // Calculate the duration of the event
                                     val duration = targetEvent.endTime.getTime() - targetEvent.startTime.getTime()
@@ -542,7 +593,12 @@ fun HomePage() {
                                 },
                             allEvents = events, // Pass full events list for drop operations
                             onEventClick = { event ->
-                                // Event click handled in CalendarCell
+                                // Set up edit dialog with event data
+                                editingEvent = event
+                                editEventTitle = event.title
+                                editEventDescription = event.description
+                                editEventMode = event.mode
+                                showEditDialog = true
                             },
                             onEventUpdate = { updatedEvent ->
                                 val index = events.indexOfFirst { it.id == updatedEvent.id }
@@ -950,8 +1006,8 @@ fun HomePage() {
             }
         }
 
-        // Task Creation Dialog
-        if (showTaskDialog) {
+        // Event Edit Dialog
+        if (showEditDialog && editingEvent != null) {
             Box(
                 modifier =
                     Modifier
@@ -974,6 +1030,7 @@ fun HomePage() {
                     modifier =
                         Modifier
                             .backgroundColor(Color(ThemeManager.Colors.calendarBackground))
+                            .backgroundColor(Colors.White)
                             .padding(24.px)
                             .borderRadius(8.px)
                             .maxWidth(400.px)
@@ -981,12 +1038,12 @@ fun HomePage() {
                 ) {
                     Column {
                         SpanText(
-                            "Create New Task",
-                            Modifier
-                                .fontSize(18.px)
-                                .fontWeight(700)
-                                .margin(bottom = 16.px)
-                                .color(Color(ThemeManager.Colors.text)),
+                "Create New Task",
+                Modifier
+                    .fontSize(18.px)
+                    .fontWeight(700)
+                    .margin(bottom = 16.px)
+                    .color(Color(ThemeManager.Colors.text)),
                         )
 
                         SpanText(
@@ -1194,47 +1251,39 @@ fun HomePage() {
                                         padding(8.px, 16.px)
                                         backgroundColor(Color(ThemeManager.Colors.buttonBackground))
                                         color(Color(ThemeManager.Colors.buttonText))
-                                        border(0.px)
-                                        borderRadius(4.px)
-                                        cursor(Cursor.Pointer)
                                     }
+                                }
+                            )
+                        }
+                        // The code from the 'main' branch for the Edit Dialog follows.
+                        // You should place this block within your Edit Dialog's structure.
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .styleModifier {
+                                    property("justify-content", "space-between")
+                                    property("gap", "8px")
                                 },
-                            ) {
-                                SpanText("Cancel")
-                            }
+                        ) {
+                            // Delete button
                             Button(
                                 attrs = {
                                     onClick {
-                                        if (newTaskTitle.isNotBlank()) {
-                                            val now = Date()
-                                            val startTime = Date(now.getFullYear(), now.getMonth(), now.getDate(), 9) // 9 AM
-                                            val endTime = Date(now.getFullYear(), now.getMonth(), now.getDate(), 10) // 10 AM
-
-                                            val newTask =
-                                                CalendarEvent(
-                                                    id = CalendarUtils.createEventId(),
-                                                    title = newTaskTitle,
-                                                    description = newTaskDescription,
-                                                    startTime = startTime,
-                                                    endTime = endTime,
-                                                    mode = EventMode.ACTIVE, // Tasks are always active
-                                                    isRecurring = isRecurring,
-                                                    recurrenceFrequency = if (isRecurring) recurrenceFrequency else null,
-                                                )
-
-                                            events.add(newTask)
-
-                                            showTaskDialog = false
-                                            newTaskTitle = ""
-                                            newTaskDescription = ""
-                                            isRecurring = false
-                                            recurrenceFrequency = RecurrenceFrequency.DAILY
-                                            customHours = 24
+                                        editingEvent?.let { event ->
+                                            val index = events.indexOfFirst { it.id == event.id }
+                                            if (index >= 0) {
+                                                events.removeAt(index)
+                                            }
                                         }
+                                        showEditDialog = false
+                                        editingEvent = null
+                                        editEventTitle = ""
+                                        editEventDescription = ""
+                                        editEventMode = EventMode.PASSIVE
                                     }
                                     style {
                                         padding(8.px, 16.px)
-                                        backgroundColor(Color("#dc2626")) // Red for tasks
+                                        backgroundColor(Color("#dc2626"))
                                         color(Colors.White)
                                         border(0.px)
                                         borderRadius(4.px)
@@ -1242,13 +1291,189 @@ fun HomePage() {
                                     }
                                 },
                             ) {
-                                SpanText("Create Task")
+// This block handles the buttons for the "Create Task" dialog
+                        // from the copilot/fix-535ddee3-ef27-4d17-be5d-a487faef270b branch
+                        Button(
+                            attrs = {
+                                onClick {
+                                    showTaskDialog = false
+                                    newTaskTitle = ""
+                                    newTaskDescription = ""
+                                    isRecurring = false
+                                    recurrenceFrequency = RecurrenceFrequency.DAILY
+                                }
+                                style {
+                                    padding(8.px, 16.px)
+                                    // Add styling for your cancel button here if needed
+                                }
                             }
+                        ) {
+                            SpanText("Cancel")
+                        }
+                        Button(
+                            attrs = {
+                                onClick {
+                                    if (newTaskTitle.isNotBlank()) {
+                                        val now = Date()
+                                        val startTime = Date(now.getFullYear(), now.getMonth(), now.getDate(), 9) // 9 AM
+                                        val endTime = Date(now.getFullYear(), now.getMonth(), now.getDate(), 10) // 10 AM
+
+                                        val newTask = CalendarEvent(
+                                            id = CalendarUtils.createEventId(),
+                                            title = newTaskTitle,
+                                            description = newTaskDescription,
+                                            startTime = startTime,
+                                            endTime = endTime,
+                                            mode = EventMode.ACTIVE, // Tasks are always active
+                                            isRecurring = isRecurring,
+                                            recurrenceFrequency = if (isRecurring) recurrenceFrequency else null,
+                                        )
+
+                                        events.add(newTask)
+
+                                        showTaskDialog = false
+                                        newTaskTitle = ""
+                                        newTaskDescription = ""
+                                        isRecurring = false
+                                        recurrenceFrequency = RecurrenceFrequency.DAILY
+                                        customHours = 24
+                                    }
+                                }
+                                style {
+                                    padding(8.px, 16.px)
+                                    backgroundColor(Color("#dc2626")) // Red for tasks
+                                    color(Colors.White)
+                                    border(0.px)
+                                    borderRadius(4.px)
+                                    cursor(Cursor.Pointer)
+                                }
+                            },
+                        ) {
+                            SpanText("Create Task")
                         }
                     }
                 }
             }
         }
+    }
+
+    // This block handles the "Edit Event" dialog and its buttons
+    // from the main branch
+    if (showEditDialog) {
+        // Assuming this is inside your dialog container for editing
+        // ... (Dialog content like TextInputs would go here)
+        
+        // Buttons for Delete, Cancel, and Save
+        Column(
+            modifier = Modifier.styleModifier {
+                property("gap", "8px")
+            }
+        ) {
+            Button( // Delete button
+                attrs = {
+                    onClick {
+                        editingEvent?.let { eventToDelete ->
+                            events.removeAll { it.id == eventToDelete.id }
+                        }
+                        showEditDialog = false
+                        editingEvent = null
+                    }
+                    style {
+                        padding(8.px, 16.px)
+                        backgroundColor(Color("#dc2626")) // Red for delete
+                        color(Colors.White)
+                        border(0.px)
+                        borderRadius(4.px)
+                        cursor(Cursor.Pointer)
+                    }
+                }
+            ) {
+                SpanText("Delete")
+            }
+
+            Row(
+                modifier = Modifier.styleModifier {
+                    property("gap", "8px")
+                },
+            ) {
+                // Cancel button
+                Button(
+                    attrs = {
+                        onClick {
+                            showEditDialog = false
+                            editingEvent = null
+                            editEventTitle = ""
+                            editEventDescription = ""
+                            editEventMode = EventMode.PASSIVE
+                        }
+                        style {
+                            padding(8.px, 16.px)
+                            backgroundColor(
+                                com.varabyte.kobweb.compose.ui.graphics.Color.rgba(
+                                    229f / 255f,
+                                    231f / 255f,
+                                    235f / 255f,
+                                    1f,
+                                ),
+                            )
+                            border(0.px)
+                            borderRadius(4.px)
+                            cursor(Cursor.Pointer)
+                        }
+                    },
+                ) {
+                    SpanText("Cancel")
+                }
+
+                // Save button
+                Button(
+                    attrs = {
+                        onClick {
+                            if (editEventTitle.isNotBlank() && editingEvent != null) {
+                                val updatedEvent = editingEvent!!.copy(
+                                    title = editEventTitle,
+                                    description = editEventDescription,
+                                    mode = editEventMode,
+                                )
+
+                                val index = events.indexOfFirst { it.id == updatedEvent.id }
+                                if (index >= 0) {
+                                    events[index] = updatedEvent
+                                }
+
+                                showEditDialog = false
+                                editingEvent = null
+                                editEventTitle = ""
+                                editEventDescription = ""
+                                editEventMode = EventMode.PASSIVE
+                            }
+                        }
+                        style {
+                            padding(8.px, 16.px)
+                            backgroundColor(
+                                com.varabyte.kobweb.compose.ui.graphics.Color.rgba(
+                                    59f / 255f,
+                                    130f / 255f,
+                                    246f / 255f,
+                                    1f,
+                                ),
+                            )
+                            color(Colors.White)
+                            border(0.px)
+                            borderRadius(4.px)
+                            cursor(Cursor.Pointer)
+                        }
+                    },
+                ) {
+                    SpanText("Save")
+                }
+            }
+        }
+    }
+} // This closing brace might be for your overall dialog container or page content
+
+// ... the rest of your file continues here, for example:
+// Weekly Task Manager
         WeeklyTaskManager(
             tasks = tasks,
             onTaskAdd = { task ->
@@ -1269,6 +1494,8 @@ fun HomePage() {
             onAutoSort = { autoSortedEvents ->
                 // Add the auto-sorted events to the calendar
                 events.addAll(autoSortedEvents)
+                // Clear all tasks after auto-sorting them to calendar
+                tasks.clear()
             }
         )
     }
