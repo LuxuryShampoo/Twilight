@@ -394,8 +394,10 @@ fun CalendarCell(
                             Modifier
                                 .fillMaxWidth()
                                 .margin(bottom = if (index < activeEvents.size - 1) 1.px else 0.px)
-                                .onClick { e ->
-                                    val isShiftClick = e.shiftKey
+                                .onClick { clickEvent ->
+                                    // Access shiftKey from the DOM event
+                                    val domEvent = clickEvent.nativeEvent
+                                    val isShiftClick = domEvent.asDynamic().shiftKey as Boolean
                                     if (isShiftClick) {
                                         GlobalSelectionState.toggleSelection(event.id, true)
                                     } else {
@@ -569,8 +571,10 @@ fun CalendarCell(
                             Modifier
                                 .fillMaxWidth()
                                 .margin(bottom = if (index < passiveEvents.size - 1) 1.px else 0.px)
-                                .onClick { e ->
-                                    val isShiftClick = e.shiftKey
+                                .onClick { clickEvent ->
+                                    // Access shiftKey from the DOM event
+                                    val domEvent = clickEvent.nativeEvent
+                                    val isShiftClick = domEvent.asDynamic().shiftKey as Boolean
                                     if (isShiftClick) {
                                         GlobalSelectionState.toggleSelection(event.id, true)
                                     } else {

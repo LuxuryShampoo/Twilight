@@ -83,8 +83,8 @@ fun HomePage() {
     
     // Keyboard event handling for delete and undo
     LaunchedEffect(Unit) {
-        kotlinx.browser.document.addEventListener("keydown", { event ->
-            val keyEvent = event as org.w3c.dom.events.KeyboardEvent
+        val keyListener: (dynamic) -> Unit = { event ->
+            val keyEvent = event.unsafeCast<org.w3c.dom.events.KeyboardEvent>()
             when {
                 keyEvent.key == "Delete" && GlobalSelectionState.selectedEventIds.isNotEmpty() -> {
                     // Delete selected events
@@ -94,21 +94,23 @@ fun HomePage() {
                         events.remove(event)
                     }
                     GlobalSelectionState.clearSelection()
-                    event.preventDefault()
+                    keyEvent.preventDefault()
                 }
                 keyEvent.ctrlKey && keyEvent.key == "z" && deletedEvents.isNotEmpty() -> {
                     // Undo - restore last deleted events
                     val lastDeleted = deletedEvents.removeLastOrNull()
                     lastDeleted?.let { events.add(it) }
-                    event.preventDefault()
+                    keyEvent.preventDefault()
                 }
                 keyEvent.key == "Escape" -> {
                     // Clear selection on Escape
                     GlobalSelectionState.clearSelection()
-                    event.preventDefault()
+                    keyEvent.preventDefault()
                 }
             }
-        })
+        }
+        
+        kotlinx.browser.document.addEventListener("keydown", keyListener)
     }
 
     // Calendar configuration - removed EventStyleConfig as it doesn't exist
