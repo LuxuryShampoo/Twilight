@@ -28,7 +28,7 @@ data class WeeklyTask(
 )
 
 enum class TaskPriority {
-    LOW, MEDIUM, HIGH, URGENT
+    LOW, MEDIUM, HIGH, URGENT, END
 }
 
 @Composable
@@ -361,6 +361,7 @@ fun TaskItem(
         TaskPriority.MEDIUM -> "#3b82f6"
         TaskPriority.HIGH -> "#f59e0b"
         TaskPriority.URGENT -> "#ef4444"
+        TaskPriority.END -> "#8b5cf6"
     }
 
     Box(
@@ -439,19 +440,33 @@ fun autoSortTasks(tasks: List<WeeklyTask>): List<CalendarEvent> {
     val now = Date()
     val events = mutableListOf<CalendarEvent>()
     
-    // Sort tasks by priority and estimated time
-    val sortedTasks = tasks.filter { !it.isCompleted }
+    // Separate END tasks from regular tasks
+    val completedTasks = tasks.filter { !it.isCompleted }
+    val endTasks = completedTasks.filter { it.priority == TaskPriority.END }
+    val regularTasks = completedTasks.filter { it.priority != TaskPriority.END }
         .sortedWith(compareByDescending<WeeklyTask> { it.priority.ordinal }
             .thenBy { it.estimatedHours })
     
     var currentHour = 9.0 // Start at 9 AM
     var currentDay = 0
+    val workDayEnd = 17.0 // End at 5 PM
     
-    sortedTasks.forEach { task ->
+    // Schedule regular tasks first
+    regularTasks.forEach { task ->
         // Skip weekends (simple implementation)
         if (currentDay >= 5) {
             currentDay = 0
             currentHour = 9.0
+        }
+        
+        // Check if task fits in current day
+        if (currentHour + task.estimatedHours > workDayEnd) {
+            currentDay++
+            currentHour = 9.0
+            // Skip weekends again
+            if (currentDay >= 5) {
+                currentDay = 0
+            }
         }
         
         // Create event for the task
@@ -492,6 +507,7 @@ fun autoSortTasks(tasks: List<WeeklyTask>): List<CalendarEvent> {
                 TaskPriority.MEDIUM -> "#3b82f6" // Blue  
                 TaskPriority.HIGH -> "#f59e0b"   // Orange
                 TaskPriority.URGENT -> "#ef4444" // Red
+                TaskPriority.END -> "#8b5cf6"    // Purple
             }
         )
         
@@ -499,9 +515,44 @@ fun autoSortTasks(tasks: List<WeeklyTask>): List<CalendarEvent> {
         
         // Move to next time slot
         currentHour += task.estimatedHours
-        if (currentHour >= 17.0) { // End at 5 PM
-            currentDay++
-            currentHour = 9.0
+    }
+    
+    // Handle END tasks - schedule them to fill remaining time each day
+    if (endTasks.isNotEmpty()) {
+        val endTask = endTasks.first() // Use the first END task
+        
+        // For each work day, find the earliest available time and fill to end of day
+        for (day in 0 until 5) {
+            val dayStartHour = if (day == currentDay && currentHour > 9.0) currentHour else 9.0
+            
+            if (dayStartHour < workDayEnd) {
+                val startTime = Date(
+                    now.getFullYear(),
+                    now.getMonth(),
+                    now.getDate() + day,
+                    dayStartHour.toInt(),
+                    ((dayStartHour % 1) * 60).toInt()
+                )
+                val endTime = Date(
+                    now.getFullYear(),
+                    now.getMonth(),
+                    now.getDate() + day,
+                    workDayEnd.toInt(),
+                    0
+                )
+                
+                val endEvent = CalendarEvent(
+                    id = CalendarUtils.createEventId(),
+                    title = endTask.title,
+                    description = endTask.description + " (END - fills remaining day)",
+                    startTime = startTime,
+                    endTime = endTime,
+                    mode = EventMode.PASSIVE,
+                    color = "#8b5cf6" // Purple for END tasks
+                )
+                
+                events.add(endEvent)
+            }
         }
     }
     
