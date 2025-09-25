@@ -363,7 +363,7 @@ fun CalendarCell(
                                 .fillMaxWidth()
                                 .margin(bottom = if (index < activeEvents.size - 1) 2.px else 0.px)
                                 .onClick {
-                                    editingEvent = if (isActive) null else event
+                                    onEventClick(event)
                                 }
                                 .onMouseEnter { 
                                     if (!isDragging) isHovered = true 
@@ -517,7 +517,7 @@ fun CalendarCell(
                                 .fillMaxWidth()
                                 .margin(bottom = if (index < passiveEvents.size - 1) 2.px else 0.px)
                                 .onClick {
-                                    editingEvent = if (isActive) null else event
+                                    onEventClick(event)
                                 }
                                 .onMouseEnter { 
                                     if (!isDragging) isHovered = true 
