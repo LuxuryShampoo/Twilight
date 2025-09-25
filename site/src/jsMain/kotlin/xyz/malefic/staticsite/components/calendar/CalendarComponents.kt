@@ -655,3 +655,211 @@ fun CalendarCell(
         }
     }
 }
+
+/**
+ * Month view calendar component that displays a monthly grid with events.
+ */
+@Composable
+fun MonthCalendar(
+    displayDate: Date,
+    events: List<CalendarEvent>,
+    onEventClick: (CalendarEvent) -> Unit,
+    onEventUpdate: (CalendarEvent) -> Unit,
+    onEventDelete: (CalendarEvent) -> Unit,
+) {
+    val currentDate = Date()
+    val today = Date(currentDate.getFullYear(), currentDate.getMonth(), currentDate.getDate())
+    
+    // Calculate the first day of the month and the number of days
+    val firstDayOfMonth = Date(displayDate.getFullYear(), displayDate.getMonth(), 1)
+    val lastDayOfMonth = Date(displayDate.getFullYear(), displayDate.getMonth() + 1, 0)
+    val daysInMonth = lastDayOfMonth.getDate()
+    val startDayOfWeek = firstDayOfMonth.getDay() // 0 = Sunday, 1 = Monday, etc.
+    
+    // Calculate total cells needed (including previous/next month days)
+    val totalCells = 42 // 6 weeks * 7 days
+    
+    Box(
+        Modifier
+            .fillMaxWidth()
+            .backgroundColor(Color(ThemeManager.Colors.calendarBackground))
+            .border(1.px, LineStyle.Solid, Color(ThemeManager.Colors.border))
+            .borderRadius(8.px)
+            .overflow(Overflow.Hidden)
+    ) {
+        Column {
+            // Day headers
+            Row {
+                listOf("Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat").forEach { day ->
+                    Box(
+                        Modifier
+                            .fillMaxWidth()
+                            .backgroundColor(Color(ThemeManager.Colors.headerBackground))
+                            .padding(12.px)
+                            .border(1.px, LineStyle.Solid, Color(ThemeManager.Colors.border))
+                            .styleModifier {
+                                property("flex", "1")
+                            },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        SpanText(
+                            day,
+                            Modifier
+                                .fontSize(14.px)
+                                .fontWeight(FontWeight.Bold)
+                                .color(Color(ThemeManager.Colors.text))
+                        )
+                    }
+                }
+            }
+            
+            // Calendar grid
+            for (week in 0 until 6) {
+                Row {
+                    for (day in 0..6) {
+                        val cellIndex = week * 7 + day
+                        val dayNumber = cellIndex - startDayOfWeek + 1
+                        
+                        val isCurrentMonth = dayNumber >= 1 && dayNumber <= daysInMonth
+                        val cellDate = if (isCurrentMonth) {
+                            Date(displayDate.getFullYear(), displayDate.getMonth(), dayNumber)
+                        } else if (dayNumber < 1) {
+                            // Previous month
+                            val prevMonth = if (displayDate.getMonth() == 0) 11 else displayDate.getMonth() - 1
+                            val prevYear = if (displayDate.getMonth() == 0) displayDate.getFullYear() - 1 else displayDate.getFullYear()
+                            val daysInPrevMonth = Date(prevYear, prevMonth + 1, 0).getDate()
+                            Date(prevYear, prevMonth, daysInPrevMonth + dayNumber)
+                        } else {
+                            // Next month
+                            val nextMonth = if (displayDate.getMonth() == 11) 0 else displayDate.getMonth() + 1
+                            val nextYear = if (displayDate.getMonth() == 11) displayDate.getFullYear() + 1 else displayDate.getFullYear()
+                            Date(nextYear, nextMonth, dayNumber - daysInMonth)
+                        }
+                        
+                        val isToday = CalendarUtils.formatDate(cellDate) == CalendarUtils.formatDate(today)
+                        val dayEvents = CalendarUtils.getEventsForDate(
+                            xyz.malefic.staticsite.util.Calendar("temp", "temp", 
+                                xyz.malefic.staticsite.util.CalendarTheme("temp", "#000", "#000"), 
+                                events.toMutableList()
+                            ), 
+                            cellDate
+                        )
+                        
+                        MonthCalendarCell(
+                            date = cellDate,
+                            dayNumber = if (isCurrentMonth) dayNumber else if (dayNumber < 1) dayNumber + Date(displayDate.getFullYear(), displayDate.getMonth(), 0).getDate() else dayNumber - daysInMonth,
+                            isCurrentMonth = isCurrentMonth,
+                            isToday = isToday,
+                            events = dayEvents,
+                            onEventClick = onEventClick,
+                            onEventUpdate = onEventUpdate,
+                            onEventDelete = onEventDelete
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+/**
+ * Individual cell in the month calendar view.
+ */
+@Composable
+fun MonthCalendarCell(
+    date: Date,
+    dayNumber: Int,
+    isCurrentMonth: Boolean,
+    isToday: Boolean,
+    events: List<CalendarEvent>,
+    onEventClick: (CalendarEvent) -> Unit,
+    onEventUpdate: (CalendarEvent) -> Unit,
+    onEventDelete: (CalendarEvent) -> Unit,
+) {
+    Box(
+        Modifier
+            .fillMaxWidth()
+            .minHeight(120.px)
+            .backgroundColor(
+                when {
+                    isToday -> Color(ThemeManager.Colors.todayHighlight)
+                    !isCurrentMonth -> Color(if (ThemeManager.isDarkMode) "#0f0f0f" else "#f8f9fa")
+                    else -> Color(ThemeManager.Colors.calendarBackground)
+                }
+            )
+            .border(1.px, LineStyle.Solid, Color(ThemeManager.Colors.border))
+            .padding(4.px)
+            .position(Position.Relative)
+            .styleModifier {
+                property("flex", "1")
+            }
+    ) {
+        Column {
+            // Day number
+            SpanText(
+                dayNumber.toString(),
+                Modifier
+                    .fontSize(14.px)
+                    .fontWeight(if (isToday) FontWeight.Bold else FontWeight.Normal)
+                    .color(
+                        Color(
+                            when {
+                                isToday -> if (ThemeManager.isDarkMode) "#ffffff" else "#1f2937"
+                                !isCurrentMonth -> ThemeManager.Colors.secondaryText
+                                else -> ThemeManager.Colors.text
+                            }
+                        )
+                    )
+                    .margin(bottom = 4.px)
+            )
+            
+            // Events
+            events.take(3).forEachIndexed { index, event ->
+                Box(
+                    Modifier
+                        .fillMaxWidth()
+                        .backgroundColor(
+                            Color(
+                                if (event.isPassive) {
+                                    if (ThemeManager.isDarkMode) "#3b82f6" else "#2563eb"
+                                } else {
+                                    if (ThemeManager.isDarkMode) "#ef4444" else "#dc2626"
+                                }
+                            )
+                        )
+                        .borderRadius(2.px)
+                        .padding(2.px, 4.px)
+                        .margin(bottom = 2.px)
+                        .cursor(Cursor.Pointer)
+                        .onClick { onEventClick(event) }
+                        .styleModifier {
+                            property("transition", "all 0.2s ease")
+                        }
+                ) {
+                    SpanText(
+                        event.title,
+                        Modifier
+                            .fontSize(10.px)
+                            .color(Colors.White)
+                            .styleModifier {
+                                property("white-space", "nowrap")
+                                property("overflow", "hidden")
+                                property("text-overflow", "ellipsis")
+                            }
+                    )
+                }
+            }
+            
+            // Show "X more" if there are more than 3 events
+            if (events.size > 3) {
+                SpanText(
+                    "+${events.size - 3} more",
+                    Modifier
+                        .fontSize(10.px)
+                        .color(Color(ThemeManager.Colors.secondaryText))
+                        .cursor(Cursor.Pointer)
+                )
+            }
+        }
+    }
+}
