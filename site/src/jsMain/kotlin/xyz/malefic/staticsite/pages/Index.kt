@@ -778,24 +778,6 @@ fun HomePage() {
                         ) {
                             Text("+ Add Event")
                         }
-                        
-                        Button(
-                            attrs = {
-                                onClick { showTaskDialog = true }
-                                style {
-                                    padding(12.px, 24.px)
-                                    backgroundColor(Color("#dc2626")) // Red for tasks (active)
-                                    color(Colors.White)
-                                    border(0.px)
-                                    borderRadius(4.px)
-                                    cursor(Cursor.Pointer)
-                                    fontSize(16.px)
-                                    fontWeight(500)
-                                }
-                            },
-                        ) {
-                            Text("+ Add Task")
-                        }
                     }
 
                     // Today button
