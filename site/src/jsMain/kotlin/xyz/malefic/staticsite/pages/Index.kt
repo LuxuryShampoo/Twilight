@@ -170,7 +170,7 @@ fun HomePage() {
     // Undo/Redo state management
     val deletedEvents = remember { mutableStateListOf<CalendarEvent>() }
     
-    // Keyboard event handling for delete and undo
+    // Keyboard and click event handling for delete, undo, and deselection
     LaunchedEffect(Unit) {
         val keyListener: (dynamic) -> Unit = { event ->
             val keyEvent = event.unsafeCast<org.w3c.dom.events.KeyboardEvent>()
@@ -199,7 +199,24 @@ fun HomePage() {
             }
         }
         
+        // Click-outside-to-deselect functionality
+        val clickListener: (dynamic) -> Unit = { event ->
+            val clickEvent = event.unsafeCast<org.w3c.dom.events.MouseEvent>()
+            val target = clickEvent.target.unsafeCast<org.w3c.dom.Element>()
+            
+            // Check if the clicked element is not an event or part of event UI
+            val isEventElement = target.classList.contains("event-element") || 
+                                target.closest(".event-element") != null ||
+                                target.classList.contains("event-tooltip") ||
+                                target.closest(".event-tooltip") != null
+            
+            if (!isEventElement && GlobalSelectionState.selectedEventIds.isNotEmpty()) {
+                GlobalSelectionState.clearSelection()
+            }
+        }
+        
         kotlinx.browser.document.addEventListener("keydown", keyListener)
+        kotlinx.browser.document.addEventListener("click", clickListener)
     }
 
     // Calendar configuration - removed EventStyleConfig as it doesn't exist
@@ -403,7 +420,7 @@ fun HomePage() {
                 },
             ) {
                 Tr {
-                    // Month and Year
+                    // Week Range Display
                     Td(
                         attrs = {
                             style {
@@ -411,6 +428,26 @@ fun HomePage() {
                             }
                         },
                     ) {
+                        // Calculate the Sunday-Saturday range for the current week
+                        val currentDayOfWeek = displayDate.getDay() // 0 = Sunday, 1 = Monday, ..., 6 = Saturday
+                        val sundayTime = displayDate.getTime() - (currentDayOfWeek * 24 * 60 * 60 * 1000)
+                        val saturdayTime = sundayTime + (6 * 24 * 60 * 60 * 1000)
+                        
+                        val sundayDate = Date(sundayTime)
+                        val saturdayDate = Date(saturdayTime)
+                        
+                        val startMonth = monthNames[sundayDate.getMonth()]
+                        val endMonth = monthNames[saturdayDate.getMonth()]
+                        val startDay = sundayDate.getDate()
+                        val endDay = saturdayDate.getDate()
+                        val year = sundayDate.getFullYear()
+                        
+                        val weekRangeText = if (startMonth == endMonth) {
+                            "$startMonth $startDay - $endDay, $year"
+                        } else {
+                            "$startMonth $startDay - $endMonth $endDay, $year"
+                        }
+                        
                         H2(
                             attrs = {
                                 style {
@@ -419,7 +456,7 @@ fun HomePage() {
                                 }
                             },
                         ) {
-                            Text("$currentMonth $currentYear")
+                            Text(weekRangeText)
                         }
                     }
 
@@ -434,14 +471,9 @@ fun HomePage() {
                         Button(
                             attrs = {
                                 onClick {
-                                    // Go to previous month by creating a new Date with the previous month
-                                    val currentMonth = displayDate.getMonth()
-                                    val currentYear = displayDate.getFullYear()
-
-                                    val newMonth = if (currentMonth == 0) 11 else currentMonth - 1
-                                    val newYear = if (currentMonth == 0) currentYear - 1 else currentYear
-
-                                    displayDate = Date(newYear, newMonth, 1)
+                                    // Go to previous week by subtracting 7 days
+                                    val currentTime = displayDate.getTime()
+                                    displayDate = Date(currentTime - (7 * 24 * 60 * 60 * 1000))
                                 }
                                 style {
                                     padding(8.px, 16.px)
@@ -453,14 +485,17 @@ fun HomePage() {
                                 }
                             },
                         ) {
-                            Text("Previous Month")
+                            Text("Previous Week")
                         }
 
                         Button(
                             attrs = {
                                 onClick {
-                                    // Reset to current date
-                                    displayDate = Date()
+                                    // Go to current week (start of current week - Sunday)
+                                    val now = Date()
+                                    val dayOfWeek = now.getDay() // 0 = Sunday, 1 = Monday, ..., 6 = Saturday
+                                    val sundayTime = now.getTime() - (dayOfWeek * 24 * 60 * 60 * 1000)
+                                    displayDate = Date(sundayTime)
                                 }
                                 style {
                                     padding(8.px, 16.px)
@@ -472,20 +507,15 @@ fun HomePage() {
                                 }
                             },
                         ) {
-                            Text("Today")
+                            Text("This Week")
                         }
 
                         Button(
                             attrs = {
                                 onClick {
-                                    // Go to next month by creating a new Date with the next month
-                                    val currentMonth = displayDate.getMonth()
-                                    val currentYear = displayDate.getFullYear()
-
-                                    val newMonth = if (currentMonth == 11) 0 else currentMonth + 1
-                                    val newYear = if (currentMonth == 11) currentYear + 1 else currentYear
-
-                                    displayDate = Date(newYear, newMonth, 1)
+                                    // Go to next week by adding 7 days
+                                    val currentTime = displayDate.getTime()
+                                    displayDate = Date(currentTime + (7 * 24 * 60 * 60 * 1000))
                                 }
                                 style {
                                     padding(8.px, 16.px)
@@ -496,7 +526,7 @@ fun HomePage() {
                                 }
                             },
                         ) {
-                            Text("Next Month")
+                            Text("Next Week")
                         }
                     }
                 }
@@ -527,11 +557,14 @@ fun HomePage() {
                     },
             ) {}
 
-            // Day headers with day names and dates
+            // Day headers with day names and dates - Sunday to Saturday week view
             for (dayOffset in 0..6) {
-                val dayDate = Date(displayDate.getTime() + dayOffset * 24 * 60 * 60 * 1000)
+                // Calculate the Sunday of the week containing displayDate
+                val currentDayOfWeek = displayDate.getDay() // 0 = Sunday, 1 = Monday, ..., 6 = Saturday
+                val sundayTime = displayDate.getTime() - (currentDayOfWeek * 24 * 60 * 60 * 1000)
+                val dayDate = Date(sundayTime + dayOffset * 24 * 60 * 60 * 1000)
                 val dayNames = listOf("Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat")
-                val dayName = dayNames[dayDate.getDay()]
+                val dayName = dayNames[dayOffset] // dayOffset 0=Sunday, 1=Monday, etc.
 
                 Box(
                     Modifier
@@ -593,9 +626,12 @@ fun HomePage() {
                 }
             }
 
-            // Calendar cells (6 AM to 5 AM)
+            // Calendar cells (6 AM to 5 AM) - Sunday to Saturday week view
             for (dayOffset in 0..6) {
-                val dayDate = Date(displayDate.getTime() + dayOffset * 24 * 60 * 60 * 1000)
+                // Calculate the Sunday of the week containing displayDate
+                val currentDayOfWeek = displayDate.getDay() // 0 = Sunday, 1 = Monday, ..., 6 = Saturday
+                val sundayTime = displayDate.getTime() - (currentDayOfWeek * 24 * 60 * 60 * 1000)
+                val dayDate = Date(sundayTime + dayOffset * 24 * 60 * 60 * 1000)
 
                 for (hour in 0..23) {
                     val actualHour = (hour + 6) % 24 // Start from 6 AM
@@ -773,7 +809,11 @@ fun HomePage() {
                         Button(
                             attrs = {
                                 onClick { 
-                                    displayDate = Date()
+                                    // Go to current week (start of current week - Sunday)
+                                    val now = Date()
+                                    val dayOfWeek = now.getDay() // 0 = Sunday, 1 = Monday, ..., 6 = Saturday
+                                    val sundayTime = now.getTime() - (dayOfWeek * 24 * 60 * 60 * 1000)
+                                    displayDate = Date(sundayTime)
                                 }
                                 style {
                                     padding(8.px, 16.px)
@@ -786,7 +826,7 @@ fun HomePage() {
                                 }
                             },
                         ) {
-                            Text("Today")
+                            Text("This Week")
                         }
                     }
                 }
@@ -1086,6 +1126,166 @@ fun HomePage() {
                                 },
                             ) {
                                 SpanText("Create Event")
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // Task Creation Dialog - Fixed to properly show when showTaskDialog is true
+        if (showTaskDialog) {
+            Box(
+                modifier =
+                    Modifier
+                        .position(Position.Fixed)
+                        .top(0.px)
+                        .left(0.px)
+                        .right(0.px)
+                        .bottom(0.px)
+                        .backgroundColor(
+                            com.varabyte.kobweb.compose.ui.graphics.Color
+                                .rgba(0f, 0f, 0f, 0.5f),
+                        ).display(DisplayStyle.Flex)
+                        .styleModifier {
+                            property("justify-content", "center")
+                            property("align-items", "center")
+                            property("z-index", "1000")
+                        },
+            ) {
+                Box(
+                    modifier =
+                        Modifier
+                            .backgroundColor(Color(ThemeManager.Colors.calendarBackground))
+                            .padding(24.px)
+                            .borderRadius(8.px)
+                            .maxWidth(400.px)
+                            .width(100.percent),
+                ) {
+                    Column {
+                        SpanText(
+                            "Create New Task",
+                            Modifier
+                                .fontSize(18.px)
+                                .fontWeight(700)
+                                .margin(bottom = 16.px)
+                                .color(Color(ThemeManager.Colors.text)),
+                        )
+
+                        SpanText(
+                            "Title",
+                            Modifier
+                                .fontSize(14.px)
+                                .fontWeight(500)
+                                .margin(bottom = 4.px)
+                                .color(Color(ThemeManager.Colors.text)),
+                        )
+
+                        TextInput(
+                            attrs = {
+                                value(newTaskTitle)
+                                onInput { newTaskTitle = it.value }
+                                style {
+                                    width(100.percent)
+                                    marginBottom(12.px)
+                                    padding(8.px)
+                                    border(1.px, LineStyle.Solid, Color(ThemeManager.Colors.border))
+                                    borderRadius(4.px)
+                                    backgroundColor(Color(ThemeManager.Colors.calendarBackground))
+                                    color(Color(ThemeManager.Colors.text))
+                                }
+                            },
+                        )
+
+                        SpanText(
+                            "Description",
+                            Modifier
+                                .fontSize(14.px)
+                                .fontWeight(500)
+                                .margin(bottom = 4.px)
+                                .color(Color(ThemeManager.Colors.text)),
+                        )
+
+                        TextArea(
+                            attrs = {
+                                value(newTaskDescription)
+                                onInput { newTaskDescription = it.value }
+                                style {
+                                    width(100.percent)
+                                    marginBottom(16.px)
+                                    padding(8.px)
+                                    border(1.px, LineStyle.Solid, Color(ThemeManager.Colors.border))
+                                    borderRadius(4.px)
+                                    backgroundColor(Color(ThemeManager.Colors.calendarBackground))
+                                    color(Color(ThemeManager.Colors.text))
+                                    minHeight(80.px)
+                                    resize(Resize.Vertical)
+                                }
+                            },
+                        )
+
+                        // Action buttons
+                        Row(
+                            modifier =
+                                Modifier
+                                    .fillMaxWidth()
+                                    .styleModifier {
+                                        property("justify-content", "flex-end")
+                                        property("gap", "8px")
+                                    },
+                        ) {
+                            Button(
+                                attrs = {
+                                    onClick {
+                                        showTaskDialog = false
+                                        newTaskTitle = ""
+                                        newTaskDescription = ""
+                                    }
+                                    style {
+                                        padding(8.px, 16.px)
+                                        backgroundColor(Color(ThemeManager.Colors.buttonBackground))
+                                        color(Color(ThemeManager.Colors.buttonText))
+                                        border(1.px, LineStyle.Solid, Color(ThemeManager.Colors.border))
+                                        borderRadius(4.px)
+                                        cursor(Cursor.Pointer)
+                                    }
+                                },
+                            ) {
+                                SpanText("Cancel")
+                            }
+
+                            Button(
+                                attrs = {
+                                    onClick {
+                                        if (newTaskTitle.isNotBlank()) {
+                                            // Create and add the task
+                                            val newTask = WeeklyTask(
+                                                id = "task-${Date().getTime()}",
+                                                title = newTaskTitle,
+                                                description = newTaskDescription,
+                                                estimatedHours = 1,
+                                                priority = TaskPriority.MEDIUM,
+                                                dueDate = null
+                                            )
+                                            tasks.add(newTask)
+                                            
+                                            // Reset form
+                                            showTaskDialog = false
+                                            newTaskTitle = ""
+                                            newTaskDescription = ""
+                                        }
+                                    }
+                                    style {
+                                        padding(8.px, 16.px)
+                                        backgroundColor(Color(ThemeManager.Colors.primaryButton))
+                                        color(Colors.White)
+                                        border(0.px)
+                                        borderRadius(4.px)
+                                        cursor(Cursor.Pointer)
+                                    }
+                                },
+                            ) {
+                                SpanText("Create Task")
                             }
                         }
                     }
