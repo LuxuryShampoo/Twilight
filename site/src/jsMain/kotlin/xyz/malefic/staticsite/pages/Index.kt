@@ -1261,7 +1261,7 @@ fun HomePage() {
                                                 id = "task-${Date().getTime()}",
                                                 title = newTaskTitle,
                                                 description = newTaskDescription,
-                                                estimatedHours = 1,
+                                                estimatedHours = 1.0,
                                                 priority = TaskPriority.MEDIUM,
                                                 dueDate = null
                                             )
