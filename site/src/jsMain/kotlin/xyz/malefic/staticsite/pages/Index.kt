@@ -1261,7 +1261,7 @@ fun HomePage() {
                                                 id = "task-${Date().getTime()}",
                                                 title = newTaskTitle,
                                                 description = newTaskDescription,
-                                                estimatedHours = 1,
+                                                estimatedHours = 1.0,
                                                 priority = TaskPriority.MEDIUM,
                                                 dueDate = null
                                             )
@@ -1777,6 +1777,8 @@ fun HomePage() {
                 }
             },
             onAutoSort = { autoSortedEvents ->
+                // Clear existing FREE events from the calendar
+                events.removeAll { it.title == "FREE" }
                 // Add the auto-sorted events to the calendar
                 events.addAll(autoSortedEvents)
                 // Clear all tasks after auto-sorting them to calendar

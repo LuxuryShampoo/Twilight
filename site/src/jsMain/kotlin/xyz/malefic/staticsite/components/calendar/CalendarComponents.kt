@@ -447,7 +447,8 @@ fun CalendarCell(
                                     if (isShiftClick) {
                                         GlobalSelectionState.toggleSelection(event.id, true)
                                     } else {
-                                        editingEvent = if (isActive) null else event
+                                        // Call the onEventClick callback to open edit dialog
+                                        onEventClick(event)
                                         GlobalSelectionState.toggleSelection(event.id, false)
                                     }
                                 }
@@ -624,7 +625,8 @@ fun CalendarCell(
                                     if (isShiftClick) {
                                         GlobalSelectionState.toggleSelection(event.id, true)
                                     } else {
-                                        editingEvent = if (isActive) null else event
+                                        // Call the onEventClick callback to open edit dialog
+                                        onEventClick(event)
                                         GlobalSelectionState.toggleSelection(event.id, false)
                                     }
                                 }

@@ -21,14 +21,14 @@ data class WeeklyTask(
     val id: String,
     val title: String,
     val description: String,
-    val estimatedHours: Int,
+    val estimatedHours: Double,
     val priority: TaskPriority,
     val dueDate: Date?,
     val isCompleted: Boolean = false
 )
 
 enum class TaskPriority {
-    LOW, MEDIUM, HIGH, URGENT
+    LOW, MEDIUM, HIGH, URGENT, END
 }
 
 @Composable
@@ -42,7 +42,7 @@ fun WeeklyTaskManager(
     var showAddTaskDialog by remember { mutableStateOf(false) }
     var newTaskTitle by remember { mutableStateOf("") }
     var newTaskDescription by remember { mutableStateOf("") }
-    var newTaskHours by remember { mutableStateOf(1) }
+    var newTaskHours by remember { mutableStateOf(1.0) }
     var newTaskPriority by remember { mutableStateOf(TaskPriority.MEDIUM) }
 
     Column(
@@ -204,7 +204,7 @@ fun WeeklyTaskManager(
 
                         // Estimated Hours
                         SpanText(
-                            "Estimated Hours: $newTaskHours",
+                            "Estimated Hours: ${if (newTaskHours % 1 == 0.0) newTaskHours.toInt().toString() else newTaskHours.toString()}",
                             Modifier
                                 .color(Color(ThemeManager.Colors.text))
                                 .margin(bottom = 8.px)
@@ -213,12 +213,14 @@ fun WeeklyTaskManager(
                         Input(
                             type = InputType.Range,
                             attrs = {
-                                attr("min", "1")
-                                attr("max", "8")
-                                value(newTaskHours.toString())
+                                attr("min", "0")
+                                attr("max", "12") // 0 to 3 hours in 0.25 increments = 12 steps  
+                                attr("step", "1")
+                                value((newTaskHours * 4).toInt().toString()) // Convert to slider steps
                                 onInput { event -> 
                                     val target = event.target as HTMLInputElement
-                                    newTaskHours = target.value.toIntOrNull() ?: 1 
+                                    val steps = target.value.toIntOrNull() ?: 4 // Default to 1 hour (4 steps)
+                                    newTaskHours = steps / 4.0 // Convert steps back to hours
                                 }
                                 style {
                                     width(100.percent)
@@ -292,7 +294,7 @@ fun WeeklyTaskManager(
                                         showAddTaskDialog = false
                                         newTaskTitle = ""
                                         newTaskDescription = ""
-                                        newTaskHours = 1
+                                        newTaskHours = 1.0
                                         newTaskPriority = TaskPriority.MEDIUM
                                     }
                                     style {
@@ -324,7 +326,7 @@ fun WeeklyTaskManager(
                                             showAddTaskDialog = false
                                             newTaskTitle = ""
                                             newTaskDescription = ""
-                                            newTaskHours = 1
+                                            newTaskHours = 1.0
                                             newTaskPriority = TaskPriority.MEDIUM
                                         }
                                     }
@@ -359,6 +361,7 @@ fun TaskItem(
         TaskPriority.MEDIUM -> "#3b82f6"
         TaskPriority.HIGH -> "#f59e0b"
         TaskPriority.URGENT -> "#ef4444"
+        TaskPriority.END -> "#8b5cf6"
     }
 
     Box(
@@ -405,7 +408,7 @@ fun TaskItem(
                 }
                 
                 SpanText(
-                    "${task.estimatedHours}h • ${task.priority.name}",
+                    "${if (task.estimatedHours % 1 == 0.0) task.estimatedHours.toInt().toString() else task.estimatedHours.toString()}h • ${task.priority.name}",
                     Modifier
                         .fontSize(11.px)
                         .color(Color(ThemeManager.Colors.secondaryText))
@@ -437,33 +440,55 @@ fun autoSortTasks(tasks: List<WeeklyTask>): List<CalendarEvent> {
     val now = Date()
     val events = mutableListOf<CalendarEvent>()
     
-    // Sort tasks by priority and estimated time
-    val sortedTasks = tasks.filter { !it.isCompleted }
+    // Separate END tasks from regular tasks
+    val completedTasks = tasks.filter { !it.isCompleted }
+    val endTasks = completedTasks.filter { it.priority == TaskPriority.END }
+    val regularTasks = completedTasks.filter { it.priority != TaskPriority.END }
         .sortedWith(compareByDescending<WeeklyTask> { it.priority.ordinal }
             .thenBy { it.estimatedHours })
     
-    var currentHour = 9 // Start at 9 AM
+    var currentHour = 9.0 // Start at 9 AM
     var currentDay = 0
+    val workDayEnd = 17.0 // End at 5 PM
     
-    sortedTasks.forEach { task ->
+    // Schedule regular tasks first
+    regularTasks.forEach { task ->
         // Skip weekends (simple implementation)
         if (currentDay >= 5) {
             currentDay = 0
-            currentHour = 9
+            currentHour = 9.0
+        }
+        
+        // Check if task fits in current day
+        if (currentHour + task.estimatedHours > workDayEnd) {
+            currentDay++
+            currentHour = 9.0
+            // Skip weekends again
+            if (currentDay >= 5) {
+                currentDay = 0
+            }
         }
         
         // Create event for the task
+        val startHour = currentHour.toInt()
+        val startMinute = ((currentHour % 1) * 60).toInt()
+        val endTime = currentHour + task.estimatedHours
+        val endHour = endTime.toInt()
+        val endMinute = ((endTime % 1) * 60).toInt()
+        
         val startTime = Date(
             now.getFullYear(),
             now.getMonth(),
             now.getDate() + currentDay,
-            currentHour
+            startHour,
+            startMinute
         )
-        val endTime = Date(
+        val endTimeDate = Date(
             now.getFullYear(),
             now.getMonth(),
             now.getDate() + currentDay,
-            currentHour + task.estimatedHours
+            endHour,
+            endMinute
         )
         
         val event = CalendarEvent(
@@ -471,7 +496,7 @@ fun autoSortTasks(tasks: List<WeeklyTask>): List<CalendarEvent> {
             title = task.title,
             description = task.description,
             startTime = startTime,
-            endTime = endTime,
+            endTime = endTimeDate,
             mode = if (task.priority == TaskPriority.HIGH || task.priority == TaskPriority.URGENT) {
                 EventMode.ACTIVE
             } else {
@@ -482,6 +507,7 @@ fun autoSortTasks(tasks: List<WeeklyTask>): List<CalendarEvent> {
                 TaskPriority.MEDIUM -> "#3b82f6" // Blue  
                 TaskPriority.HIGH -> "#f59e0b"   // Orange
                 TaskPriority.URGENT -> "#ef4444" // Red
+                TaskPriority.END -> "#8b5cf6"    // Purple
             }
         )
         
@@ -489,9 +515,44 @@ fun autoSortTasks(tasks: List<WeeklyTask>): List<CalendarEvent> {
         
         // Move to next time slot
         currentHour += task.estimatedHours
-        if (currentHour >= 17) { // End at 5 PM
-            currentDay++
-            currentHour = 9
+    }
+    
+    // Handle END tasks - schedule them to fill remaining time each day
+    if (endTasks.isNotEmpty()) {
+        val endTask = endTasks.first() // Use the first END task
+        
+        // For each work day, find the earliest available time and fill to end of day
+        for (day in 0 until 5) {
+            val dayStartHour = if (day == currentDay && currentHour > 9.0) currentHour else 9.0
+            
+            if (dayStartHour < workDayEnd) {
+                val startTime = Date(
+                    now.getFullYear(),
+                    now.getMonth(),
+                    now.getDate() + day,
+                    dayStartHour.toInt(),
+                    ((dayStartHour % 1) * 60).toInt()
+                )
+                val endTime = Date(
+                    now.getFullYear(),
+                    now.getMonth(),
+                    now.getDate() + day,
+                    workDayEnd.toInt(),
+                    0
+                )
+                
+                val endEvent = CalendarEvent(
+                    id = CalendarUtils.createEventId(),
+                    title = endTask.title,
+                    description = endTask.description + " (END - fills remaining day)",
+                    startTime = startTime,
+                    endTime = endTime,
+                    mode = EventMode.PASSIVE,
+                    color = "#8b5cf6" // Purple for END tasks
+                )
+                
+                events.add(endEvent)
+            }
         }
     }
     
