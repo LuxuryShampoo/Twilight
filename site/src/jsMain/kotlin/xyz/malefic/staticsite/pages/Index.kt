@@ -14,6 +14,7 @@ import org.jetbrains.compose.web.css.*
 import org.jetbrains.compose.web.dom.*
 import org.w3c.dom.HTMLElement
 import xyz.malefic.staticsite.components.calendar.CalendarCell
+import xyz.malefic.staticsite.components.calendar.GlobalSelectionState
 import xyz.malefic.staticsite.components.WeeklyTaskManager
 import xyz.malefic.staticsite.components.WeeklyTask
 import xyz.malefic.staticsite.components.TaskPriority
@@ -76,6 +77,41 @@ fun HomePage() {
 
     // State for weekly tasks
     val tasks = remember { mutableStateListOf<WeeklyTask>() }
+
+    // Undo/Redo state management
+    val deletedEvents = remember { mutableStateListOf<CalendarEvent>() }
+    
+    // Keyboard event handling for delete and undo
+    LaunchedEffect(Unit) {
+        val keyListener: (dynamic) -> Unit = { event ->
+            val keyEvent = event.unsafeCast<org.w3c.dom.events.KeyboardEvent>()
+            when {
+                keyEvent.key == "Delete" && GlobalSelectionState.selectedEventIds.isNotEmpty() -> {
+                    // Delete selected events
+                    val eventsToDelete = events.filter { GlobalSelectionState.selectedEventIds.contains(it.id) }
+                    eventsToDelete.forEach { event ->
+                        deletedEvents.add(event)
+                        events.remove(event)
+                    }
+                    GlobalSelectionState.clearSelection()
+                    keyEvent.preventDefault()
+                }
+                keyEvent.ctrlKey && keyEvent.key == "z" && deletedEvents.isNotEmpty() -> {
+                    // Undo - restore last deleted events
+                    val lastDeleted = deletedEvents.removeLastOrNull()
+                    lastDeleted?.let { events.add(it) }
+                    keyEvent.preventDefault()
+                }
+                keyEvent.key == "Escape" -> {
+                    // Clear selection on Escape
+                    GlobalSelectionState.clearSelection()
+                    keyEvent.preventDefault()
+                }
+            }
+        }
+        
+        kotlinx.browser.document.addEventListener("keydown", keyListener)
+    }
 
     // Calendar configuration - removed EventStyleConfig as it doesn't exist
     // LaunchedEffect(Unit) {
@@ -1153,6 +1189,8 @@ fun HomePage() {
             onAutoSort = { autoSortedEvents ->
                 // Add the auto-sorted events to the calendar
                 events.addAll(autoSortedEvents)
+                // Clear all tasks after auto-sorting them to calendar
+                tasks.clear()
             }
         )
     }

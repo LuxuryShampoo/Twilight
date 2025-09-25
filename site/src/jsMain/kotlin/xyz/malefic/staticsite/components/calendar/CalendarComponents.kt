@@ -30,6 +30,37 @@ object GlobalDragState {
     var draggingId by mutableStateOf<String?>(null)
 }
 
+// Selection state management
+object GlobalSelectionState {
+    val selectedEventIds = mutableStateListOf<String>()
+    
+    fun isSelected(eventId: String): Boolean = selectedEventIds.contains(eventId)
+    
+    fun toggleSelection(eventId: String, isShiftClick: Boolean = false) {
+        if (isShiftClick) {
+            // For shift-click, add to existing selection
+            if (isSelected(eventId)) {
+                selectedEventIds.remove(eventId)
+            } else {
+                selectedEventIds.add(eventId)
+            }
+        } else {
+            // For regular click, clear selection and select only this event
+            selectedEventIds.clear()
+            selectedEventIds.add(eventId)
+        }
+    }
+    
+    fun clearSelection() {
+        selectedEventIds.clear()
+    }
+    
+    fun selectAll(eventIds: List<String>) {
+        selectedEventIds.clear()
+        selectedEventIds.addAll(eventIds)
+    }
+}
+
 // Calendar Grid Styles
 val CalendarGridStyle =
     CssStyle.base {
@@ -348,22 +379,31 @@ fun CalendarCell(
         if (activeEvents.isNotEmpty()) {
             Box(
                 Modifier
-                    .width(50.percent)
+                    .width(if (passiveEvents.isEmpty()) 100.percent else 60.percent)
                     .align(Alignment.CenterStart)
                     .padding(2.px)
             ) {
                 Column {
                     activeEvents.forEachIndexed { index, event ->
                         val isActive = event == editingEvent
+                        val isSelected = GlobalSelectionState.isSelected(event.id)
                         var isHovered by remember { mutableStateOf(false) }
                         val isDragging = GlobalDragState.draggingId == event.id
 
                         Box(
                             Modifier
                                 .fillMaxWidth()
-                                .margin(bottom = if (index < activeEvents.size - 1) 2.px else 0.px)
-                                .onClick {
-                                    onEventClick(event)
+                                .margin(bottom = if (index < activeEvents.size - 1) 1.px else 0.px)
+                                .onClick { clickEvent ->
+                                    // Access shiftKey from the DOM event
+                                    val domEvent = clickEvent.nativeEvent
+                                    val isShiftClick = domEvent.asDynamic().shiftKey as Boolean
+                                    if (isShiftClick) {
+                                        GlobalSelectionState.toggleSelection(event.id, true)
+                                    } else {
+                                        editingEvent = if (isActive) null else event
+                                        GlobalSelectionState.toggleSelection(event.id, false)
+                                    }
                                 }
                                 .onMouseEnter { 
                                     if (!isDragging) isHovered = true 
@@ -371,11 +411,22 @@ fun CalendarCell(
                                 .onMouseLeave { 
                                     if (!isDragging) isHovered = false 
                                 }
-                                .padding(4.px)
+                                .padding(6.px, 8.px)
                                 .backgroundColor(
-                                    Color(if (ThemeManager.isDarkMode) "#ef4444" else "#dc2626")
-                                ) // Red for active events
+                                    Color(
+                                        if (isSelected) {
+                                            if (ThemeManager.isDarkMode) "#b91c1c" else "#991b1b"
+                                        } else {
+                                            if (ThemeManager.isDarkMode) "#ef4444" else "#dc2626"
+                                        }
+                                    )
+                                ) // Red for active events, darker when selected
                                 .borderRadius(4.px)
+                                .border(
+                                    if (isSelected) 2.px else 0.px,
+                                    LineStyle.Solid,
+                                    Color("#fbbf24")
+                                ) // Yellow border for selected events
                                 .zIndex(if (isHovered && !isDragging) 10 else 1)
                                 .styleModifier {
                                     if (!isDragging) {
@@ -387,6 +438,7 @@ fun CalendarCell(
                                     }
                                     property("cursor", if (isDragging) "grabbing" else "grab")
                                     property("user-select", "none")
+                                    property("min-height", "24px") // Ensure minimum readable height
                                 }
                                 .position(Position.Relative)
                                 .attrsModifier {
@@ -406,7 +458,7 @@ fun CalendarCell(
                                 text = event.title,
                                 modifier = Modifier
                                     .color(Colors.White)
-                                    .fontSize(12.px)
+                                    .fontSize(13.px)
                                     .fontWeight(FontWeight.Bold)
                                     .styleModifier {
                                         property("white-space", "nowrap")
@@ -414,6 +466,7 @@ fun CalendarCell(
                                         property("text-overflow", "ellipsis")
                                         property("max-width", "100%")
                                         property("pointer-events", "none")
+                                        property("line-height", "1.2")
                                         if (!isHovered && !isActive && !isDragging) {
                                             property("opacity", "0.85")
                                             property("transition", "opacity 0.3s ease-in-out")
@@ -500,24 +553,34 @@ fun CalendarCell(
         if (passiveEvents.isNotEmpty()) {
             Box(
                 Modifier
-                    .width(50.percent)
+                    .width(if (activeEvents.isEmpty()) 100.percent else 60.percent)
                     .align(Alignment.CenterEnd)
                     .padding(2.px)
             ) {
                 Column {
                     passiveEvents.forEachIndexed { index, event ->
                         val isActive = event == editingEvent
+                        val isSelected = GlobalSelectionState.isSelected(event.id)
                         var isHovered by remember { mutableStateOf(false) }
                         val isDragging = GlobalDragState.draggingId == event.id
-                        // Add transparency for stacked events (top one more transparent)
-                        val alpha = if (index == 0 && passiveEvents.size > 1) 0.8f else 1f
+                        // Improved stacking - reduce overlap more gradually
+                        val stackOffset = if (passiveEvents.size > 1) index * -3 else 0
+                        val alpha = if (index == 0 && passiveEvents.size > 1) 0.9f else 1f
 
                         Box(
                             Modifier
                                 .fillMaxWidth()
-                                .margin(bottom = if (index < passiveEvents.size - 1) 2.px else 0.px)
-                                .onClick {
-                                    onEventClick(event)
+                                .margin(bottom = if (index < passiveEvents.size - 1) 1.px else 0.px)
+                                .onClick { clickEvent ->
+                                    // Access shiftKey from the DOM event
+                                    val domEvent = clickEvent.nativeEvent
+                                    val isShiftClick = domEvent.asDynamic().shiftKey as Boolean
+                                    if (isShiftClick) {
+                                        GlobalSelectionState.toggleSelection(event.id, true)
+                                    } else {
+                                        editingEvent = if (isActive) null else event
+                                        GlobalSelectionState.toggleSelection(event.id, false)
+                                    }
                                 }
                                 .onMouseEnter { 
                                     if (!isDragging) isHovered = true 
@@ -525,14 +588,26 @@ fun CalendarCell(
                                 .onMouseLeave { 
                                     if (!isDragging) isHovered = false 
                                 }
-                                .padding(4.px)
+                                .padding(6.px, 8.px)
                                 .backgroundColor(
-                                    Color(if (ThemeManager.isDarkMode) "#3b82f6" else "#2563eb")
-                                ) // Blue for passive events
+                                    Color(
+                                        if (isSelected) {
+                                            if (ThemeManager.isDarkMode) "#1d4ed8" else "#1e40af"
+                                        } else {
+                                            if (ThemeManager.isDarkMode) "#3b82f6" else "#2563eb"
+                                        }
+                                    )
+                                ) // Blue for passive events, darker when selected
                                 .borderRadius(4.px)
+                                .border(
+                                    if (isSelected) 2.px else 0.px,
+                                    LineStyle.Solid,
+                                    Color("#fbbf24")
+                                ) // Yellow border for selected events
                                 .zIndex(if (isHovered && !isDragging) 10 else (passiveEvents.size - index))
                                 .styleModifier {
                                     property("opacity", alpha.toString())
+                                    property("margin-top", "${stackOffset}px")
                                     if (!isDragging) {
                                         property("transition", "all 0.2s ease-in-out")
                                         if (isHovered) {
@@ -542,6 +617,7 @@ fun CalendarCell(
                                     }
                                     property("cursor", if (isDragging) "grabbing" else "grab")
                                     property("user-select", "none")
+                                    property("min-height", "24px") // Ensure minimum readable height
                                 }
                                 .position(Position.Relative)
                                 .attrsModifier {
@@ -561,7 +637,7 @@ fun CalendarCell(
                                 text = event.title,
                                 modifier = Modifier
                                     .color(Colors.White)
-                                    .fontSize(12.px)
+                                    .fontSize(13.px)
                                     .fontWeight(FontWeight.Bold)
                                     .styleModifier {
                                         property("white-space", "nowrap")
@@ -569,6 +645,7 @@ fun CalendarCell(
                                         property("text-overflow", "ellipsis")
                                         property("max-width", "100%")
                                         property("pointer-events", "none")
+                                        property("line-height", "1.2")
                                         if (!isHovered && !isActive && !isDragging) {
                                             property("opacity", "0.85")
                                             property("transition", "opacity 0.3s ease-in-out")
