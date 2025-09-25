@@ -170,7 +170,7 @@ fun HomePage() {
     // Undo/Redo state management
     val deletedEvents = remember { mutableStateListOf<CalendarEvent>() }
     
-    // Keyboard event handling for delete and undo
+    // Keyboard and click event handling for delete, undo, and deselection
     LaunchedEffect(Unit) {
         val keyListener: (dynamic) -> Unit = { event ->
             val keyEvent = event.unsafeCast<org.w3c.dom.events.KeyboardEvent>()
@@ -199,7 +199,24 @@ fun HomePage() {
             }
         }
         
+        // Click-outside-to-deselect functionality
+        val clickListener: (dynamic) -> Unit = { event ->
+            val clickEvent = event.unsafeCast<org.w3c.dom.events.MouseEvent>()
+            val target = clickEvent.target.unsafeCast<org.w3c.dom.Element>()
+            
+            // Check if the clicked element is not an event or part of event UI
+            val isEventElement = target.classList.contains("event-element") || 
+                                target.closest(".event-element") != null ||
+                                target.classList.contains("event-tooltip") ||
+                                target.closest(".event-tooltip") != null
+            
+            if (!isEventElement && GlobalSelectionState.selectedEventIds.isNotEmpty()) {
+                GlobalSelectionState.clearSelection()
+            }
+        }
+        
         kotlinx.browser.document.addEventListener("keydown", keyListener)
+        kotlinx.browser.document.addEventListener("click", clickListener)
     }
 
     // Calendar configuration - removed EventStyleConfig as it doesn't exist

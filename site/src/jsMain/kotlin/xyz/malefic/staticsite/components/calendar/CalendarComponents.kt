@@ -644,6 +644,10 @@ fun CalendarCell(
                                     Color("#fbbf24")
                                 ) // Yellow border for selected events
                                 .zIndex(if (isHovered && !isDragging) 10 else (passiveEvents.size - index))
+                                .attrsModifier {
+                                    // Add event-element class for click-outside detection
+                                    classes("event-element")
+                                }
                                 .styleModifier {
                                     property("opacity", alpha.toString())
                                     property("margin-top", "${stackOffset}px")
@@ -711,6 +715,10 @@ fun CalendarCell(
                                         .borderRadius(6.px) // Slightly more rounded
                                         .fontSize(11.px)
                                         .zIndex(1000) // Higher z-index to ensure visibility
+                                        .attrsModifier {
+                                            // Add event-tooltip class for click-outside detection
+                                            classes("event-tooltip")
+                                        }
                                         .styleModifier {
                                             property("box-shadow", "0 4px 12px rgba(0,0,0,0.25)")
                                             property("max-width", "250px") // Increased max width
@@ -757,6 +765,10 @@ fun CalendarCell(
                                                 onEventDelete(event)
                                                 editingEvent = null
                                             }
+                                        }
+                                        .attrsModifier {
+                                            // Add event-element class for click-outside detection
+                                            classes("event-element")
                                         }
                                         .styleModifier {
                                             property("transition", "all 0.2s ease")
