@@ -515,6 +515,17 @@ fun CalendarCell(
                                     property("cursor", if (isDragging) "grabbing" else "grab")
                                     property("user-select", "none")
                                     property("min-height", "24px") // Ensure minimum readable height
+                                    
+                                    // Make event span multiple grid rows based on duration
+                                    val durationInSlots = event.durationInSlots
+                                    if (durationInSlots > 1) {
+                                        property("position", "absolute")
+                                        property("top", "0")
+                                        property("left", "6px")
+                                        property("right", "6px")
+                                        property("height", "${durationInSlots * 40 - 2}px") // 40px per slot minus border
+                                        property("z-index", "5")
+                                    }
                                 }
                                 .position(Position.Relative)
                                 .attrsModifier {
@@ -618,6 +629,42 @@ fun CalendarCell(
                                             .styleModifier {
                                                 property("line-height", "1")
                                                 property("user-select", "none")
+                                            }
+                                    )
+                                }
+                            }
+
+                            // Resize handle at the bottom of the event
+                            if (event.durationInSlots > 1 || isActive) {
+                                Box(
+                                    Modifier
+                                        .align(Alignment.BottomCenter)
+                                        .width(100.percent)
+                                        .height(8.px)
+                                        .backgroundColor(Color.rgba(255, 255, 255, 0.3f))
+                                        .cursor(Cursor.SResize)
+                                        .styleModifier {
+                                            property("border-top", "1px solid rgba(255,255,255,0.5)")
+                                            property("transition", "all 0.2s ease")
+                                        }
+                                        .onMouseEnter {
+                                            // Add visual feedback for resize handle
+                                        }
+                                        .attrsModifier {
+                                            classes("event-resize-handle")
+                                            attr("data-event-id", event.id)
+                                        }
+                                ) {
+                                    // Small resize indicator
+                                    Box(
+                                        Modifier
+                                            .align(Alignment.Center)
+                                            .width(20.px)
+                                            .height(3.px)
+                                            .backgroundColor(Colors.White)
+                                            .borderRadius(2.px)
+                                            .styleModifier {
+                                                property("opacity", "0.7")
                                             }
                                     )
                                 }

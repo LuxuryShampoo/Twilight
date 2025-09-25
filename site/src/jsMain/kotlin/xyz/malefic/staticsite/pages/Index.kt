@@ -724,11 +724,14 @@ fun HomePage() {
                             hour = actualHour,
                             events =
                                 events.filter { event ->
-                                    // Only show events that match this specific date and hour
+                                    // Only show events that START at this specific date and hour
+                                    // (events will span multiple cells using CSS grid)
                                     event.startTime.getFullYear() == cellDate.getFullYear() &&
                                         event.startTime.getMonth() == cellDate.getMonth() &&
                                         event.startTime.getDate() == cellDate.getDate() &&
-                                        event.startTime.getHours() == actualHour
+                                        event.startTime.getHours() == actualHour &&
+                                        event.startTime.getMinutes() >= minutes &&
+                                        event.startTime.getMinutes() < minutes + 30
                                 },
                             allEvents = events, // Pass full events list for drop operations
                             onEventClick = { event ->
