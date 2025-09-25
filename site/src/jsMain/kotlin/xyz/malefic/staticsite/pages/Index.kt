@@ -126,6 +126,13 @@ fun HomePage() {
     var newEventEndTime by remember { mutableStateOf<Date?>(null) }
     var newEventMode by remember { mutableStateOf(EventMode.PASSIVE) }
 
+    // State for event editing dialog
+    var showEditDialog by remember { mutableStateOf(false) }
+    var editingEvent by remember { mutableStateOf<CalendarEvent?>(null) }
+    var editEventTitle by remember { mutableStateOf("") }
+    var editEventDescription by remember { mutableStateOf("") }
+    var editEventMode by remember { mutableStateOf(EventMode.PASSIVE) }
+
     // Get month and year for display
     val monthNames =
         listOf(
@@ -529,9 +536,17 @@ fun HomePage() {
 
                                     // Create a new date at the drop position
                                     val newDate = Date(cellDate.getFullYear(), cellDate.getMonth(), cellDate.getDate(), actualHour)
-                                    val minutes = (offsetY * 60).toInt()
+                                    val rawMinutes = (offsetY * 60).toInt()
+                                    // Round to nearest half hour (0 or 30 minutes)
+                                    val minutes = if (rawMinutes < 15) 0 else if (rawMinutes < 45) 30 else 60
                                     // Use asDynamic() to access JavaScript methods
-                                    newDate.asDynamic().setMinutes(minutes)
+                                    if (minutes == 60) {
+                                        // If rounded to 60 minutes, move to next hour
+                                        newDate.asDynamic().setMinutes(0)
+                                        newDate.asDynamic().setHours(newDate.getHours() + 1)
+                                    } else {
+                                        newDate.asDynamic().setMinutes(minutes)
+                                    }
 
                                     // Calculate the duration of the event
                                     val duration = targetEvent.endTime.getTime() - targetEvent.startTime.getTime()
@@ -564,7 +579,12 @@ fun HomePage() {
                                 },
                             allEvents = events, // Pass full events list for drop operations
                             onEventClick = { event ->
-                                // Event click handled in CalendarCell
+                                // Set up edit dialog with event data
+                                editingEvent = event
+                                editEventTitle = event.title
+                                editEventDescription = event.description
+                                editEventMode = event.mode
+                                showEditDialog = true
                             },
                             onEventUpdate = { updatedEvent ->
                                 val index = events.indexOfFirst { it.id == updatedEvent.id }
@@ -878,6 +898,269 @@ fun HomePage() {
                                 },
                             ) {
                                 SpanText("Create Event")
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // Event Edit Dialog
+        if (showEditDialog && editingEvent != null) {
+            Box(
+                modifier =
+                    Modifier
+                        .position(Position.Fixed)
+                        .top(0.px)
+                        .left(0.px)
+                        .right(0.px)
+                        .bottom(0.px)
+                        .backgroundColor(
+                            com.varabyte.kobweb.compose.ui.graphics.Color
+                                .rgba(0f, 0f, 0f, 0.5f),
+                        ).display(DisplayStyle.Flex)
+                        .styleModifier {
+                            property("justify-content", "center")
+                            property("align-items", "center")
+                            property("z-index", "1000")
+                        },
+            ) {
+                Box(
+                    modifier =
+                        Modifier
+                            .backgroundColor(Colors.White)
+                            .padding(24.px)
+                            .borderRadius(8.px)
+                            .maxWidth(400.px)
+                            .width(100.percent),
+                ) {
+                    Column {
+                        SpanText(
+                            "Edit Event",
+                            Modifier
+                                .fontSize(18.px)
+                                .fontWeight(700)
+                                .margin(bottom = 16.px),
+                        )
+
+                        SpanText(
+                            "Title",
+                            Modifier
+                                .fontSize(14.px)
+                                .fontWeight(500)
+                                .margin(bottom = 4.px),
+                        )
+
+                        TextInput(
+                            attrs = {
+                                value(editEventTitle)
+                                onInput { editEventTitle = it.value }
+                                style {
+                                    width(100.percent)
+                                    marginBottom(12.px)
+                                    padding(8.px)
+                                    border(1.px, LineStyle.Solid, Color("#d1d5db"))
+                                    borderRadius(4.px)
+                                }
+                            },
+                        )
+
+                        SpanText(
+                            "Description",
+                            Modifier
+                                .fontSize(14.px)
+                                .fontWeight(500)
+                                .margin(bottom = 4.px),
+                        )
+
+                        TextArea(
+                            attrs = {
+                                value(editEventDescription)
+                                onInput { editEventDescription = it.value }
+                                style {
+                                    width(100.percent)
+                                    minHeight(60.px)
+                                    marginBottom(16.px)
+                                    padding(8.px)
+                                    border(1.px, LineStyle.Solid, Color("#d1d5db"))
+                                    borderRadius(4.px)
+                                }
+                            },
+                        )
+
+                        SpanText(
+                            "Mode",
+                            Modifier
+                                .fontSize(14.px)
+                                .fontWeight(500)
+                                .margin(bottom = 8.px),
+                        )
+
+                        Row(
+                            modifier =
+                                Modifier
+                                    .fillMaxWidth()
+                                    .margin(bottom = 24.px)
+                                    .styleModifier {
+                                        property("gap", "8px")
+                                    },
+                        ) {
+                            listOf(
+                                EventMode.ACTIVE to "Active",
+                                EventMode.PASSIVE to "Passive",
+                            ).forEach { (mode, label) ->
+                                Button(
+                                    attrs = {
+                                        onClick { editEventMode = mode }
+                                        style {
+                                            padding(8.px, 16.px)
+                                            backgroundColor(
+                                                if (editEventMode == mode) {
+                                                    com.varabyte.kobweb.compose.ui.graphics.Color.rgba(
+                                                        59f / 255f,
+                                                        130f / 255f,
+                                                        246f / 255f,
+                                                        1f,
+                                                    )
+                                                } else {
+                                                    com.varabyte.kobweb.compose.ui.graphics.Color.rgba(
+                                                        229f / 255f,
+                                                        231f / 255f,
+                                                        235f / 255f,
+                                                        1f,
+                                                    )
+                                                }
+                                            )
+                                            color(
+                                                if (editEventMode == mode) Colors.White else Colors.Black
+                                            )
+                                            border(0.px)
+                                            borderRadius(4.px)
+                                            cursor(Cursor.Pointer)
+                                            fontSize(12.px)
+                                        }
+                                    },
+                                ) {
+                                    SpanText(label)
+                                }
+                            }
+                        }
+
+                        Row(
+                            modifier =
+                                Modifier
+                                    .fillMaxWidth()
+                                    .styleModifier {
+                                        property("justify-content", "space-between")
+                                        property("gap", "8px")
+                                    },
+                        ) {
+                            // Delete button
+                            Button(
+                                attrs = {
+                                    onClick {
+                                        editingEvent?.let { event ->
+                                            val index = events.indexOfFirst { it.id == event.id }
+                                            if (index >= 0) {
+                                                events.removeAt(index)
+                                            }
+                                        }
+                                        showEditDialog = false
+                                        editingEvent = null
+                                        editEventTitle = ""
+                                        editEventDescription = ""
+                                        editEventMode = EventMode.PASSIVE
+                                    }
+                                    style {
+                                        padding(8.px, 16.px)
+                                        backgroundColor(Color("#dc2626"))
+                                        color(Colors.White)
+                                        border(0.px)
+                                        borderRadius(4.px)
+                                        cursor(Cursor.Pointer)
+                                    }
+                                },
+                            ) {
+                                SpanText("Delete")
+                            }
+
+                            Row(
+                                modifier = 
+                                    Modifier.styleModifier {
+                                        property("gap", "8px")
+                                    },
+                            ) {
+                                // Cancel button
+                                Button(
+                                    attrs = {
+                                        onClick {
+                                            showEditDialog = false
+                                            editingEvent = null
+                                            editEventTitle = ""
+                                            editEventDescription = ""
+                                            editEventMode = EventMode.PASSIVE
+                                        }
+                                        style {
+                                            padding(8.px, 16.px)
+                                            backgroundColor(
+                                                com.varabyte.kobweb.compose.ui.graphics.Color.rgba(
+                                                    229f / 255f,
+                                                    231f / 255f,
+                                                    235f / 255f,
+                                                    1f,
+                                                ),
+                                            )
+                                            border(0.px)
+                                            borderRadius(4.px)
+                                            cursor(Cursor.Pointer)
+                                        }
+                                    },
+                                ) {
+                                    SpanText("Cancel")
+                                }
+
+                                // Save button
+                                Button(
+                                    attrs = {
+                                        onClick {
+                                            if (editEventTitle.isNotBlank() && editingEvent != null) {
+                                                val updatedEvent = editingEvent!!.copy(
+                                                    title = editEventTitle,
+                                                    description = editEventDescription,
+                                                    mode = editEventMode,
+                                                )
+
+                                                val index = events.indexOfFirst { it.id == updatedEvent.id }
+                                                if (index >= 0) {
+                                                    events[index] = updatedEvent
+                                                }
+
+                                                showEditDialog = false
+                                                editingEvent = null
+                                                editEventTitle = ""
+                                                editEventDescription = ""
+                                                editEventMode = EventMode.PASSIVE
+                                            }
+                                        }
+                                        style {
+                                            padding(8.px, 16.px)
+                                            backgroundColor(
+                                                com.varabyte.kobweb.compose.ui.graphics.Color.rgba(
+                                                    59f / 255f,
+                                                    130f / 255f,
+                                                    246f / 255f,
+                                                    1f,
+                                                ),
+                                            )
+                                            color(Colors.White)
+                                            border(0.px)
+                                            borderRadius(4.px)
+                                            cursor(Cursor.Pointer)
+                                        }
+                                    },
+                                ) {
+                                    SpanText("Save")
+                                }
                             }
                         }
                     }
