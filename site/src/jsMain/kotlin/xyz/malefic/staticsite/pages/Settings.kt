@@ -79,6 +79,9 @@ fun SettingsPage() {
 
     // State for selected mode
     var selectedMode by remember { mutableStateOf(savedMode) }
+    
+    // State for calendar view
+    var selectedCalendarView by remember { mutableStateOf(localStorage.getItem("calendarView") ?: "week") }
 
     // State for settings tab
     var activeTab by remember { mutableStateOf("appearance") }
@@ -135,6 +138,7 @@ fun SettingsPage() {
             localStorage.setItem("calendarTheme", JSON.stringify(themeObj))
             localStorage.setItem("calendarTitle", calendarTitle)
             localStorage.setItem("calendarMode", selectedMode)
+            localStorage.setItem("calendarView", selectedCalendarView)
 
             showNotification("success", "Settings saved successfully!")
         } catch (e: Exception) {
@@ -989,7 +993,11 @@ fun SettingsPage() {
                                             attrs = {
                                                 name("calendarView")
                                                 value(value)
-                                                checked(value == "week") // Default to week view
+                                                checked(value == selectedCalendarView)
+                                                onChange { 
+                                                    selectedCalendarView = value
+                                                    saveSettings()
+                                                }
                                                 style {
                                                     cursor(Cursor.Pointer)
                                                 }
@@ -1025,7 +1033,7 @@ fun SettingsPage() {
                                     }
                                 },
                             ) {
-                                Text("Note: Currently only Week View is implemented.")
+                                Text("Select your preferred calendar view. Changes are saved automatically.")
                             }
                         }
 

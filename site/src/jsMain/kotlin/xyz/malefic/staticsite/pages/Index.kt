@@ -12,6 +12,7 @@ import com.varabyte.kobweb.silk.style.toModifier
 import kotlinx.browser.localStorage
 import org.jetbrains.compose.web.css.*
 import org.jetbrains.compose.web.dom.*
+import org.jetbrains.compose.web.attributes.*
 import org.w3c.dom.HTMLElement
 import xyz.malefic.staticsite.components.calendar.CalendarCell
 import xyz.malefic.staticsite.components.calendar.GlobalSelectionState
@@ -21,6 +22,7 @@ import xyz.malefic.staticsite.components.TaskPriority
 import xyz.malefic.staticsite.util.CalendarEvent
 import xyz.malefic.staticsite.util.CalendarUtils
 import xyz.malefic.staticsite.util.EventMode
+import xyz.malefic.staticsite.util.RecurrenceFrequency
 import xyz.malefic.staticsite.util.ThemeManager
 import kotlin.js.Date
 
@@ -125,6 +127,18 @@ fun HomePage() {
     var newEventStartTime by remember { mutableStateOf<Date?>(null) }
     var newEventEndTime by remember { mutableStateOf<Date?>(null) }
     var newEventMode by remember { mutableStateOf(EventMode.PASSIVE) }
+    
+    // State for task creation dialog
+    var showTaskDialog by remember { mutableStateOf(false) }
+    var newTaskTitle by remember { mutableStateOf("") }
+    var newTaskDescription by remember { mutableStateOf("") }
+    var newTaskStartTime by remember { mutableStateOf<Date?>(null) }
+    var newTaskEndTime by remember { mutableStateOf<Date?>(null) }
+    
+    // State for recurring options
+    var isRecurring by remember { mutableStateOf(false) }
+    var recurrenceFrequency by remember { mutableStateOf(RecurrenceFrequency.DAILY) }
+    var customHours by remember { mutableStateOf(24) }
 
     // State for event editing dialog
     var showEditDialog by remember { mutableStateOf(false) }
@@ -615,43 +629,11 @@ fun HomePage() {
                 },
             ) {
                 Tr {
-                    // Mode Selection
+                    // Add Event and Task buttons
                     Td(
                         attrs = {
                             style {
                                 textAlign(TextAlign.Left)
-                            }
-                        },
-                    ) {
-                        Span {
-                            Text("Mode: ")
-                        }
-
-                        // Mode buttons
-                        listOf("Passive", "Active", "Custom").forEach { mode ->
-                            Button(
-                                attrs = {
-                                    style {
-                                        padding(8.px, 16.px)
-                                        backgroundColor(if (mode == "Passive") Color(primaryColor) else Color("#f0f0f0"))
-                                        color(if (mode == "Passive") Colors.White else Color("#333"))
-                                        border(0.px)
-                                        borderRadius(4.px)
-                                        cursor(Cursor.Pointer)
-                                        marginRight(8.px)
-                                    }
-                                },
-                            ) {
-                                Text(mode)
-                            }
-                        }
-                    }
-
-                    // Add Event Button
-                    Td(
-                        attrs = {
-                            style {
-                                textAlign(TextAlign.Right)
                             }
                         },
                     ) {
@@ -667,10 +649,57 @@ fun HomePage() {
                                     cursor(Cursor.Pointer)
                                     fontSize(16.px)
                                     fontWeight(500)
+                                    marginRight(12.px)
                                 }
                             },
                         ) {
                             Text("+ Add Event")
+                        }
+                        
+                        Button(
+                            attrs = {
+                                onClick { showTaskDialog = true }
+                                style {
+                                    padding(12.px, 24.px)
+                                    backgroundColor(Color("#dc2626")) // Red for tasks (active)
+                                    color(Colors.White)
+                                    border(0.px)
+                                    borderRadius(4.px)
+                                    cursor(Cursor.Pointer)
+                                    fontSize(16.px)
+                                    fontWeight(500)
+                                }
+                            },
+                        ) {
+                            Text("+ Add Task")
+                        }
+                    }
+
+                    // Today button
+                    Td(
+                        attrs = {
+                            style {
+                                textAlign(TextAlign.Right)
+                            }
+                        },
+                    ) {
+                        Button(
+                            attrs = {
+                                onClick { 
+                                    displayDate = Date()
+                                }
+                                style {
+                                    padding(8.px, 16.px)
+                                    backgroundColor(Color(if (ThemeManager.isDarkMode) "#4A4A4A" else "#f0f0f0"))
+                                    color(Color(ThemeManager.Colors.text))
+                                    border(1.px, LineStyle.Solid, Color(ThemeManager.Colors.border))
+                                    borderRadius(4.px)
+                                    cursor(Cursor.Pointer)
+                                    fontSize(14.px)
+                                }
+                            },
+                        ) {
+                            Text("Today")
                         }
                     }
                 }
@@ -700,7 +729,7 @@ fun HomePage() {
                 Box(
                     modifier =
                         Modifier
-                            .backgroundColor(Colors.White)
+                            .backgroundColor(Color(ThemeManager.Colors.calendarBackground))
                             .padding(24.px)
                             .borderRadius(8.px)
                             .maxWidth(400.px)
@@ -712,7 +741,8 @@ fun HomePage() {
                             Modifier
                                 .fontSize(18.px)
                                 .fontWeight(700)
-                                .margin(bottom = 16.px),
+                                .margin(bottom = 16.px)
+                                .color(Color(ThemeManager.Colors.text)),
                         )
 
                         SpanText(
@@ -720,7 +750,8 @@ fun HomePage() {
                             Modifier
                                 .fontSize(14.px)
                                 .fontWeight(500)
-                                .margin(bottom = 4.px),
+                                .margin(bottom = 4.px)
+                                .color(Color(ThemeManager.Colors.text)),
                         )
 
                         TextInput(
@@ -731,8 +762,10 @@ fun HomePage() {
                                     width(100.percent)
                                     marginBottom(12.px)
                                     padding(8.px)
-                                    border(1.px, LineStyle.Solid, Color("#d1d5db"))
+                                    border(1.px, LineStyle.Solid, Color(ThemeManager.Colors.border))
                                     borderRadius(4.px)
+                                    backgroundColor(Color(ThemeManager.Colors.calendarBackground))
+                                    color(Color(ThemeManager.Colors.text))
                                 }
                             },
                         )
@@ -742,7 +775,8 @@ fun HomePage() {
                             Modifier
                                 .fontSize(14.px)
                                 .fontWeight(500)
-                                .margin(bottom = 4.px),
+                                .margin(bottom = 4.px)
+                                .color(Color(ThemeManager.Colors.text)),
                         )
 
                         TextArea(
@@ -754,67 +788,141 @@ fun HomePage() {
                                     minHeight(60.px)
                                     marginBottom(16.px)
                                     padding(8.px)
-                                    border(1.px, LineStyle.Solid, Color("#d1d5db"))
+                                    border(1.px, LineStyle.Solid, Color(ThemeManager.Colors.border))
                                     borderRadius(4.px)
+                                    backgroundColor(Color(ThemeManager.Colors.calendarBackground))
+                                    color(Color(ThemeManager.Colors.text))
                                 }
                             },
                         )
 
-                        // Event Mode Selection
+                        // Recurring Options
                         SpanText(
-                            "Event Mode",
+                            "Recurring",
                             Modifier
                                 .fontSize(14.px)
                                 .fontWeight(500)
-                                .margin(bottom = 8.px),
+                                .margin(bottom = 8.px)
+                                .color(Color(ThemeManager.Colors.text)),
                         )
 
+                        // Recurring checkbox
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .margin(bottom = 16.px)
+                                .margin(bottom = 8.px)
                                 .styleModifier {
+                                    property("align-items", "center")
                                     property("gap", "8px")
                                 }
                         ) {
-                            listOf(
-                                EventMode.PASSIVE to "Passive",
-                                EventMode.ACTIVE to "Active",
-                                EventMode.CUSTOM to "Custom"
-                            ).forEach { (mode, label) ->
-                                Button(
-                                    attrs = {
-                                        onClick { newEventMode = mode }
-                                        style {
-                                            padding(8.px, 16.px)
-                                            backgroundColor(
-                                                if (newEventMode == mode) {
-                                                    com.varabyte.kobweb.compose.ui.graphics.Color.rgba(
-                                                        59f / 255f,
-                                                        130f / 255f,
-                                                        246f / 255f,
-                                                        1f,
-                                                    )
-                                                } else {
-                                                    com.varabyte.kobweb.compose.ui.graphics.Color.rgba(
-                                                        229f / 255f,
-                                                        231f / 255f,
-                                                        235f / 255f,
-                                                        1f,
-                                                    )
-                                                }
-                                            )
-                                            color(
-                                                if (newEventMode == mode) Colors.White else Colors.Black
-                                            )
-                                            border(0.px)
-                                            borderRadius(4.px)
-                                            cursor(Cursor.Pointer)
-                                            fontSize(12.px)
+                            Input(
+                                type = InputType.Checkbox,
+                                attrs = {
+                                    checked(isRecurring)
+                                    onChange { isRecurring = it.value }
+                                    style {
+                                        cursor(Cursor.Pointer)
+                                    }
+                                }
+                            )
+                            SpanText(
+                                "Make this event recurring",
+                                Modifier
+                                    .fontSize(14.px)
+                                    .color(Color(ThemeManager.Colors.text))
+                            )
+                        }
+
+                        if (isRecurring) {
+                            // Frequency selection
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .margin(bottom = 16.px)
+                                    .styleModifier {
+                                        property("gap", "8px")
+                                    }
+                            ) {
+                                listOf(
+                                    RecurrenceFrequency.DAILY to "Daily",
+                                    RecurrenceFrequency.WEEKLY to "Weekly",
+                                    RecurrenceFrequency.CUSTOM to "Custom"
+                                ).forEach { (freq, label) ->
+                                    Button(
+                                        attrs = {
+                                            onClick { recurrenceFrequency = freq }
+                                            style {
+                                                padding(6.px, 12.px)
+                                                backgroundColor(
+                                                    if (recurrenceFrequency == freq) {
+                                                        Color(ThemeManager.Colors.primaryButton)
+                                                    } else {
+                                                        Color(ThemeManager.Colors.buttonBackground)
+                                                    }
+                                                )
+                                                color(
+                                                    if (recurrenceFrequency == freq) {
+                                                        Colors.White
+                                                    } else {
+                                                        Color(ThemeManager.Colors.buttonText)
+                                                    }
+                                                )
+                                                border(0.px)
+                                                borderRadius(4.px)
+                                                cursor(Cursor.Pointer)
+                                                fontSize(12.px)
+                                            }
+                                        },
+                                    ) {
+                                        SpanText(label)
+                                    }
+                                }
+                            }
+
+                            if (recurrenceFrequency == RecurrenceFrequency.CUSTOM) {
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .margin(bottom = 16.px)
+                                        .styleModifier {
+                                            property("align-items", "center")
+                                            property("gap", "8px")
                                         }
-                                    },
                                 ) {
-                                    SpanText(label)
+                                    SpanText(
+                                        "Every",
+                                        Modifier
+                                            .fontSize(14.px)
+                                            .color(Color(ThemeManager.Colors.text))
+                                    )
+                                    Input(
+                                        type = InputType.Number,
+                                        attrs = {
+                                            value(customHours.toString())
+                                            onInput { 
+                                                try {
+                                                    customHours = (it.value?.toInt() ?: 24).coerceAtLeast(1)
+                                                } catch (e: NumberFormatException) {
+                                                    customHours = 24
+                                                }
+                                            }
+                                            style {
+                                                width(60.px)
+                                                padding(4.px)
+                                                border(1.px, LineStyle.Solid, Color(ThemeManager.Colors.border))
+                                                borderRadius(4.px)
+                                                backgroundColor(Color(ThemeManager.Colors.calendarBackground))
+                                                color(Color(ThemeManager.Colors.text))
+                                            }
+                                        }
+                                    )
+                                    SpanText(
+                                        "hours",
+                                        Modifier
+                                            .fontSize(14.px)
+                                            .color(Color(ThemeManager.Colors.text))
+                                    )
                                 }
                             }
                         }
@@ -834,18 +942,14 @@ fun HomePage() {
                                         showEventDialog = false
                                         newEventTitle = ""
                                         newEventDescription = ""
-                                        newEventMode = EventMode.PASSIVE
+                                        isRecurring = false
+                                        recurrenceFrequency = RecurrenceFrequency.DAILY
+                                        customHours = 24
                                     }
                                     style {
                                         padding(8.px, 16.px)
-                                        backgroundColor(
-                                            com.varabyte.kobweb.compose.ui.graphics.Color.rgba(
-                                                229f / 255f,
-                                                231f / 255f,
-                                                235f / 255f,
-                                                1f,
-                                            ),
-                                        )
+                                        backgroundColor(Color(ThemeManager.Colors.buttonBackground))
+                                        color(Color(ThemeManager.Colors.buttonText))
                                         border(0.px)
                                         borderRadius(4.px)
                                         cursor(Cursor.Pointer)
@@ -869,7 +973,9 @@ fun HomePage() {
                                                     description = newEventDescription,
                                                     startTime = startTime,
                                                     endTime = endTime,
-                                                    mode = newEventMode,
+                                                    mode = EventMode.PASSIVE, // Events are always passive
+                                                    isRecurring = isRecurring,
+                                                    recurrenceFrequency = if (isRecurring) recurrenceFrequency else null,
                                                 )
 
                                             events.add(newEvent)
@@ -877,19 +983,14 @@ fun HomePage() {
                                             showEventDialog = false
                                             newEventTitle = ""
                                             newEventDescription = ""
-                                            newEventMode = EventMode.PASSIVE
+                                            isRecurring = false
+                                            recurrenceFrequency = RecurrenceFrequency.DAILY
+                                            customHours = 24
                                         }
                                     }
                                     style {
                                         padding(8.px, 16.px)
-                                        backgroundColor(
-                                            com.varabyte.kobweb.compose.ui.graphics.Color.rgba(
-                                                59f / 255f,
-                                                130f / 255f,
-                                                246f / 255f,
-                                                1f,
-                                            ),
-                                        )
+                                        backgroundColor(Color(ThemeManager.Colors.primaryButton))
                                         color(Colors.White)
                                         border(0.px)
                                         borderRadius(4.px)
@@ -928,6 +1029,7 @@ fun HomePage() {
                 Box(
                     modifier =
                         Modifier
+                            .backgroundColor(Color(ThemeManager.Colors.calendarBackground))
                             .backgroundColor(Colors.White)
                             .padding(24.px)
                             .borderRadius(8.px)
@@ -936,11 +1038,12 @@ fun HomePage() {
                 ) {
                     Column {
                         SpanText(
-                            "Edit Event",
-                            Modifier
-                                .fontSize(18.px)
-                                .fontWeight(700)
-                                .margin(bottom = 16.px),
+                "Create New Task",
+                Modifier
+                    .fontSize(18.px)
+                    .fontWeight(700)
+                    .margin(bottom = 16.px)
+                    .color(Color(ThemeManager.Colors.text)),
                         )
 
                         SpanText(
@@ -948,19 +1051,22 @@ fun HomePage() {
                             Modifier
                                 .fontSize(14.px)
                                 .fontWeight(500)
-                                .margin(bottom = 4.px),
+                                .margin(bottom = 4.px)
+                                .color(Color(ThemeManager.Colors.text)),
                         )
 
                         TextInput(
                             attrs = {
-                                value(editEventTitle)
-                                onInput { editEventTitle = it.value }
+                                value(newTaskTitle)
+                                onInput { newTaskTitle = it.value }
                                 style {
                                     width(100.percent)
                                     marginBottom(12.px)
                                     padding(8.px)
-                                    border(1.px, LineStyle.Solid, Color("#d1d5db"))
+                                    border(1.px, LineStyle.Solid, Color(ThemeManager.Colors.border))
                                     borderRadius(4.px)
+                                    backgroundColor(Color(ThemeManager.Colors.calendarBackground))
+                                    color(Color(ThemeManager.Colors.text))
                                 }
                             },
                         )
@@ -970,78 +1076,154 @@ fun HomePage() {
                             Modifier
                                 .fontSize(14.px)
                                 .fontWeight(500)
-                                .margin(bottom = 4.px),
+                                .margin(bottom = 4.px)
+                                .color(Color(ThemeManager.Colors.text)),
                         )
 
                         TextArea(
                             attrs = {
-                                value(editEventDescription)
-                                onInput { editEventDescription = it.value }
+                                value(newTaskDescription)
+                                onInput { newTaskDescription = it.value }
                                 style {
                                     width(100.percent)
                                     minHeight(60.px)
                                     marginBottom(16.px)
                                     padding(8.px)
-                                    border(1.px, LineStyle.Solid, Color("#d1d5db"))
+                                    border(1.px, LineStyle.Solid, Color(ThemeManager.Colors.border))
                                     borderRadius(4.px)
+                                    backgroundColor(Color(ThemeManager.Colors.calendarBackground))
+                                    color(Color(ThemeManager.Colors.text))
                                 }
                             },
                         )
 
+                        // Recurring Options for Tasks
                         SpanText(
-                            "Mode",
+                            "Recurring",
                             Modifier
                                 .fontSize(14.px)
                                 .fontWeight(500)
-                                .margin(bottom = 8.px),
+                                .margin(bottom = 8.px)
+                                .color(Color(ThemeManager.Colors.text)),
                         )
 
+                        // Recurring checkbox
                         Row(
-                            modifier =
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .margin(bottom = 8.px)
+                                .styleModifier {
+                                    property("align-items", "center")
+                                    property("gap", "8px")
+                                }
+                        ) {
+                            Input(
+                                type = InputType.Checkbox,
+                                attrs = {
+                                    checked(isRecurring)
+                                    onChange { isRecurring = it.value }
+                                    style {
+                                        cursor(Cursor.Pointer)
+                                    }
+                                }
+                            )
+                            SpanText(
+                                "Make this task recurring",
                                 Modifier
+                                    .fontSize(14.px)
+                                    .color(Color(ThemeManager.Colors.text))
+                            )
+                        }
+
+                        if (isRecurring) {
+                            // Frequency selection
+                            Row(
+                                modifier = Modifier
                                     .fillMaxWidth()
-                                    .margin(bottom = 24.px)
+                                    .margin(bottom = 16.px)
                                     .styleModifier {
                                         property("gap", "8px")
-                                    },
-                        ) {
-                            listOf(
-                                EventMode.ACTIVE to "Active",
-                                EventMode.PASSIVE to "Passive",
-                            ).forEach { (mode, label) ->
-                                Button(
-                                    attrs = {
-                                        onClick { editEventMode = mode }
-                                        style {
-                                            padding(8.px, 16.px)
-                                            backgroundColor(
-                                                if (editEventMode == mode) {
-                                                    com.varabyte.kobweb.compose.ui.graphics.Color.rgba(
-                                                        59f / 255f,
-                                                        130f / 255f,
-                                                        246f / 255f,
-                                                        1f,
-                                                    )
-                                                } else {
-                                                    com.varabyte.kobweb.compose.ui.graphics.Color.rgba(
-                                                        229f / 255f,
-                                                        231f / 255f,
-                                                        235f / 255f,
-                                                        1f,
-                                                    )
-                                                }
-                                            )
-                                            color(
-                                                if (editEventMode == mode) Colors.White else Colors.Black
-                                            )
-                                            border(0.px)
-                                            borderRadius(4.px)
-                                            cursor(Cursor.Pointer)
-                                            fontSize(12.px)
+                                    }
+                            ) {
+                                listOf(
+                                    RecurrenceFrequency.DAILY to "Daily",
+                                    RecurrenceFrequency.WEEKLY to "Weekly",
+                                    RecurrenceFrequency.CUSTOM to "Custom"
+                                ).forEach { (freq, label) ->
+                                    Button(
+                                        attrs = {
+                                            onClick { recurrenceFrequency = freq }
+                                            style {
+                                                padding(6.px, 12.px)
+                                                backgroundColor(
+                                                    if (recurrenceFrequency == freq) {
+                                                        Color("#dc2626") // Red for tasks
+                                                    } else {
+                                                        Color(ThemeManager.Colors.buttonBackground)
+                                                    }
+                                                )
+                                                color(
+                                                    if (recurrenceFrequency == freq) {
+                                                        Colors.White
+                                                    } else {
+                                                        Color(ThemeManager.Colors.buttonText)
+                                                    }
+                                                )
+                                                border(0.px)
+                                                borderRadius(4.px)
+                                                cursor(Cursor.Pointer)
+                                                fontSize(12.px)
+                                            }
+                                        },
+                                    ) {
+                                        SpanText(label)
+                                    }
+                                }
+                            }
+
+                            if (recurrenceFrequency == RecurrenceFrequency.CUSTOM) {
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .margin(bottom = 16.px)
+                                        .styleModifier {
+                                            property("align-items", "center")
+                                            property("gap", "8px")
                                         }
-                                    },
                                 ) {
-                                    SpanText(label)
+                                    SpanText(
+                                        "Every",
+                                        Modifier
+                                            .fontSize(14.px)
+                                            .color(Color(ThemeManager.Colors.text))
+                                    )
+                                    Input(
+                                        type = InputType.Number,
+                                        attrs = {
+                                            value(customHours.toString())
+                                            onInput { 
+                                                try {
+                                                    customHours = (it.value?.toInt() ?: 24).coerceAtLeast(1)
+                                                } catch (e: NumberFormatException) {
+                                                    customHours = 24
+                                                }
+                                            }
+                                            style {
+                                                width(60.px)
+                                                padding(4.px)
+                                                border(1.px, LineStyle.Solid, Color(ThemeManager.Colors.border))
+                                                borderRadius(4.px)
+                                                backgroundColor(Color(ThemeManager.Colors.calendarBackground))
+                                                color(Color(ThemeManager.Colors.text))
+                                            }
+                                        }
+                                    )
+                                    SpanText(
+                                        "hours",
+                                        Modifier
+                                            .fontSize(14.px)
+                                            .color(Color(ThemeManager.Colors.text))
+                                    )
                                 }
                             }
                         }
@@ -1051,9 +1233,37 @@ fun HomePage() {
                                 Modifier
                                     .fillMaxWidth()
                                     .styleModifier {
-                                        property("justify-content", "space-between")
+                                        property("justify-content", "flex-end")
                                         property("gap", "8px")
                                     },
+                        ) {
+                            Button(
+                                attrs = {
+                                    onClick {
+                                        showTaskDialog = false
+                                        newTaskTitle = ""
+                                        newTaskDescription = ""
+                                        isRecurring = false
+                                        recurrenceFrequency = RecurrenceFrequency.DAILY
+                                        customHours = 24
+                                    }
+                                    style {
+                                        padding(8.px, 16.px)
+                                        backgroundColor(Color(ThemeManager.Colors.buttonBackground))
+                                        color(Color(ThemeManager.Colors.buttonText))
+                                    }
+                                }
+                            )
+                        }
+                        // The code from the 'main' branch for the Edit Dialog follows.
+                        // You should place this block within your Edit Dialog's structure.
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .styleModifier {
+                                    property("justify-content", "space-between")
+                                    property("gap", "8px")
+                                },
                         ) {
                             // Delete button
                             Button(
@@ -1081,94 +1291,189 @@ fun HomePage() {
                                     }
                                 },
                             ) {
-                                SpanText("Delete")
-                            }
-
-                            Row(
-                                modifier = 
-                                    Modifier.styleModifier {
-                                        property("gap", "8px")
-                                    },
-                            ) {
-                                // Cancel button
-                                Button(
-                                    attrs = {
-                                        onClick {
-                                            showEditDialog = false
-                                            editingEvent = null
-                                            editEventTitle = ""
-                                            editEventDescription = ""
-                                            editEventMode = EventMode.PASSIVE
-                                        }
-                                        style {
-                                            padding(8.px, 16.px)
-                                            backgroundColor(
-                                                com.varabyte.kobweb.compose.ui.graphics.Color.rgba(
-                                                    229f / 255f,
-                                                    231f / 255f,
-                                                    235f / 255f,
-                                                    1f,
-                                                ),
-                                            )
-                                            border(0.px)
-                                            borderRadius(4.px)
-                                            cursor(Cursor.Pointer)
-                                        }
-                                    },
-                                ) {
-                                    SpanText("Cancel")
+// This block handles the buttons for the "Create Task" dialog
+                        // from the copilot/fix-535ddee3-ef27-4d17-be5d-a487faef270b branch
+                        Button(
+                            attrs = {
+                                onClick {
+                                    showTaskDialog = false
+                                    newTaskTitle = ""
+                                    newTaskDescription = ""
+                                    isRecurring = false
+                                    recurrenceFrequency = RecurrenceFrequency.DAILY
                                 }
-
-                                // Save button
-                                Button(
-                                    attrs = {
-                                        onClick {
-                                            if (editEventTitle.isNotBlank() && editingEvent != null) {
-                                                val updatedEvent = editingEvent!!.copy(
-                                                    title = editEventTitle,
-                                                    description = editEventDescription,
-                                                    mode = editEventMode,
-                                                )
-
-                                                val index = events.indexOfFirst { it.id == updatedEvent.id }
-                                                if (index >= 0) {
-                                                    events[index] = updatedEvent
-                                                }
-
-                                                showEditDialog = false
-                                                editingEvent = null
-                                                editEventTitle = ""
-                                                editEventDescription = ""
-                                                editEventMode = EventMode.PASSIVE
-                                            }
-                                        }
-                                        style {
-                                            padding(8.px, 16.px)
-                                            backgroundColor(
-                                                com.varabyte.kobweb.compose.ui.graphics.Color.rgba(
-                                                    59f / 255f,
-                                                    130f / 255f,
-                                                    246f / 255f,
-                                                    1f,
-                                                ),
-                                            )
-                                            color(Colors.White)
-                                            border(0.px)
-                                            borderRadius(4.px)
-                                            cursor(Cursor.Pointer)
-                                        }
-                                    },
-                                ) {
-                                    SpanText("Save")
+                                style {
+                                    padding(8.px, 16.px)
+                                    // Add styling for your cancel button here if needed
                                 }
                             }
+                        ) {
+                            SpanText("Cancel")
+                        }
+                        Button(
+                            attrs = {
+                                onClick {
+                                    if (newTaskTitle.isNotBlank()) {
+                                        val now = Date()
+                                        val startTime = Date(now.getFullYear(), now.getMonth(), now.getDate(), 9) // 9 AM
+                                        val endTime = Date(now.getFullYear(), now.getMonth(), now.getDate(), 10) // 10 AM
+
+                                        val newTask = CalendarEvent(
+                                            id = CalendarUtils.createEventId(),
+                                            title = newTaskTitle,
+                                            description = newTaskDescription,
+                                            startTime = startTime,
+                                            endTime = endTime,
+                                            mode = EventMode.ACTIVE, // Tasks are always active
+                                            isRecurring = isRecurring,
+                                            recurrenceFrequency = if (isRecurring) recurrenceFrequency else null,
+                                        )
+
+                                        events.add(newTask)
+
+                                        showTaskDialog = false
+                                        newTaskTitle = ""
+                                        newTaskDescription = ""
+                                        isRecurring = false
+                                        recurrenceFrequency = RecurrenceFrequency.DAILY
+                                        customHours = 24
+                                    }
+                                }
+                                style {
+                                    padding(8.px, 16.px)
+                                    backgroundColor(Color("#dc2626")) // Red for tasks
+                                    color(Colors.White)
+                                    border(0.px)
+                                    borderRadius(4.px)
+                                    cursor(Cursor.Pointer)
+                                }
+                            },
+                        ) {
+                            SpanText("Create Task")
                         }
                     }
                 }
             }
         }
+    }
 
-        // Weekly Task Manager
+    // This block handles the "Edit Event" dialog and its buttons
+    // from the main branch
+    if (showEditDialog) {
+        // Assuming this is inside your dialog container for editing
+        // ... (Dialog content like TextInputs would go here)
+        
+        // Buttons for Delete, Cancel, and Save
+        Column(
+            modifier = Modifier.styleModifier {
+                property("gap", "8px")
+            }
+        ) {
+            Button( // Delete button
+                attrs = {
+                    onClick {
+                        editingEvent?.let { eventToDelete ->
+                            events.removeAll { it.id == eventToDelete.id }
+                        }
+                        showEditDialog = false
+                        editingEvent = null
+                    }
+                    style {
+                        padding(8.px, 16.px)
+                        backgroundColor(Color("#dc2626")) // Red for delete
+                        color(Colors.White)
+                        border(0.px)
+                        borderRadius(4.px)
+                        cursor(Cursor.Pointer)
+                    }
+                }
+            ) {
+                SpanText("Delete")
+            }
+
+            Row(
+                modifier = Modifier.styleModifier {
+                    property("gap", "8px")
+                },
+            ) {
+                // Cancel button
+                Button(
+                    attrs = {
+                        onClick {
+                            showEditDialog = false
+                            editingEvent = null
+                            editEventTitle = ""
+                            editEventDescription = ""
+                            editEventMode = EventMode.PASSIVE
+                        }
+                        style {
+                            padding(8.px, 16.px)
+                            backgroundColor(
+                                com.varabyte.kobweb.compose.ui.graphics.Color.rgba(
+                                    229f / 255f,
+                                    231f / 255f,
+                                    235f / 255f,
+                                    1f,
+                                ),
+                            )
+                            border(0.px)
+                            borderRadius(4.px)
+                            cursor(Cursor.Pointer)
+                        }
+                    },
+                ) {
+                    SpanText("Cancel")
+                }
+
+                // Save button
+                Button(
+                    attrs = {
+                        onClick {
+                            if (editEventTitle.isNotBlank() && editingEvent != null) {
+                                val updatedEvent = editingEvent!!.copy(
+                                    title = editEventTitle,
+                                    description = editEventDescription,
+                                    mode = editEventMode,
+                                )
+
+                                val index = events.indexOfFirst { it.id == updatedEvent.id }
+                                if (index >= 0) {
+                                    events[index] = updatedEvent
+                                }
+
+                                showEditDialog = false
+                                editingEvent = null
+                                editEventTitle = ""
+                                editEventDescription = ""
+                                editEventMode = EventMode.PASSIVE
+                            }
+                        }
+                        style {
+                            padding(8.px, 16.px)
+                            backgroundColor(
+                                com.varabyte.kobweb.compose.ui.graphics.Color.rgba(
+                                    59f / 255f,
+                                    130f / 255f,
+                                    246f / 255f,
+                                    1f,
+                                ),
+                            )
+                            color(Colors.White)
+                            border(0.px)
+                            borderRadius(4.px)
+                            cursor(Cursor.Pointer)
+                        }
+                    },
+                ) {
+                    SpanText("Save")
+                }
+            }
+        }
+    }
+} // This closing brace might be for your overall dialog container or page content
+
+// ... the rest of your file continues here, for example:
+// Weekly Task Manager
         WeeklyTaskManager(
             tasks = tasks,
             onTaskAdd = { task ->

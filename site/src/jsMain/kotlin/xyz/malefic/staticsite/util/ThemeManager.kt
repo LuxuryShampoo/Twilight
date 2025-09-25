@@ -29,5 +29,7 @@ object ThemeManager {
     fun toggleDarkMode() {
         _isDarkMode = !_isDarkMode
         localStorage.setItem(THEME_STORAGE_KEY, if (_isDarkMode) "dark" else "light")
+        // Force a page refresh to ensure all components update
+        kotlinx.browser.window.location.reload()
     }
 }
