@@ -540,7 +540,7 @@ fun HomePage() {
                 .display(DisplayStyle.Grid)
                 .styleModifier {
                     property("grid-template-columns", "60px repeat(7, 1fr)")
-                    property("grid-template-rows", "auto auto repeat(24, 40px)")
+                    property("grid-template-rows", "auto auto repeat(48, 40px)") // Changed to 48 30-minute intervals
                     property("gap", "1px")
                 }.border(1.px, LineStyle.Solid, Color("#e6e6e6"))
                 .borderRadius(8.px)
@@ -595,16 +595,29 @@ fun HomePage() {
                 }
             }
 
-            // Time column (6 AM to 5 AM)
-            for (hour in 0..23) {
+            // Time column (6 AM to 5:30 AM) - 30-minute intervals
+            for (halfHour in 0..47) { // 48 30-minute intervals total
+                val hour = halfHour / 2
                 val displayHour = (hour + 6) % 24 // Start from 6 AM
-                val formattedHour =
+                val isHalfHour = halfHour % 2 == 1
+                
+                val formattedHour = if (!isHalfHour) {
+                    // Show full hour labels
                     when {
                         displayHour == 0 -> "12 AM"
                         displayHour < 12 -> "$displayHour AM"
                         displayHour == 12 -> "12 PM"
                         else -> "${displayHour - 12} PM"
                     }
+                } else {
+                    // Show :30 labels in smaller text
+                    val baseHour = when {
+                        displayHour == 0 -> "12"
+                        displayHour <= 12 -> "$displayHour"
+                        else -> "${displayHour - 12}"
+                    }
+                    "$baseHour:30"
+                }
 
                 Box(
                     Modifier
@@ -613,29 +626,31 @@ fun HomePage() {
                         .borderRight(1.px, LineStyle.Solid, Color("#e6e6e6"))
                         .styleModifier {
                             property("grid-column", "1")
-                            property("grid-row", "${hour + 3}")
+                            property("grid-row", "${halfHour + 3}") // +3 to account for header rows
                         },
                 ) {
                     SpanText(
                         formattedHour,
                         Modifier
-                            .fontSize(10.px)
-                            .color(Color("#646464"))
+                            .fontSize(if (isHalfHour) 8.px else 10.px) // Smaller font for :30 labels
+                            .color(Color(if (isHalfHour) "#999999" else "#646464")) // Lighter color for :30 labels
                             .textAlign(TextAlign.Right),
                     )
                 }
             }
 
-            // Calendar cells (6 AM to 5 AM) - Sunday to Saturday week view
+            // Calendar cells (6 AM to 5:30 AM) - Sunday to Saturday week view with 30-minute intervals
             for (dayOffset in 0..6) {
                 // Calculate the Sunday of the week containing displayDate
                 val currentDayOfWeek = displayDate.getDay() // 0 = Sunday, 1 = Monday, ..., 6 = Saturday
                 val sundayTime = displayDate.getTime() - (currentDayOfWeek * 24 * 60 * 60 * 1000)
                 val dayDate = Date(sundayTime + dayOffset * 24 * 60 * 60 * 1000)
 
-                for (hour in 0..23) {
+                for (halfHour in 0..47) { // 48 30-minute intervals
+                    val hour = halfHour / 2
                     val actualHour = (hour + 6) % 24 // Start from 6 AM
-                    val cellDate = Date(dayDate.getFullYear(), dayDate.getMonth(), dayDate.getDate(), actualHour)
+                    val minutes = if (halfHour % 2 == 0) 0 else 30 // 0 or 30 minutes
+                    val cellDate = Date(dayDate.getFullYear(), dayDate.getMonth(), dayDate.getDate(), actualHour, minutes)
 
                     Box(
                         Modifier
@@ -644,14 +659,15 @@ fun HomePage() {
                             .border(1.px, LineStyle.Solid, Color("#f0f0f0"))
                             .minHeight(40.px)
                             .position(Position.Relative)
-                            .id("cell-$dayOffset-$hour")
+                            .id("cell-$dayOffset-$halfHour")
                             .styleModifier {
                                 property("grid-column", "${dayOffset + 2}")
-                                property("grid-row", "${hour + 3}")
+                                property("grid-row", "${halfHour + 3}")
                             }.attrsModifier {
                                 // Add data attributes for drag and drop
                                 attr("data-date", "${cellDate.getFullYear()}-${cellDate.getMonth()}-${cellDate.getDate()}")
                                 attr("data-hour", "$actualHour")
+                                attr("data-minutes", "$minutes")
                                 attr("data-cell", "true")
 
                                 // Handle drop events for calendar cells
@@ -777,24 +793,6 @@ fun HomePage() {
                             },
                         ) {
                             Text("+ Add Event")
-                        }
-                        
-                        Button(
-                            attrs = {
-                                onClick { showTaskDialog = true }
-                                style {
-                                    padding(12.px, 24.px)
-                                    backgroundColor(Color("#dc2626")) // Red for tasks (active)
-                                    color(Colors.White)
-                                    border(0.px)
-                                    borderRadius(4.px)
-                                    cursor(Cursor.Pointer)
-                                    fontSize(16.px)
-                                    fontWeight(500)
-                                }
-                            },
-                        ) {
-                            Text("+ Add Task")
                         }
                     }
 

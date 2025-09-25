@@ -476,6 +476,12 @@ fun autoSortTasks(tasks: List<WeeklyTask>): List<CalendarEvent> {
                 EventMode.ACTIVE
             } else {
                 EventMode.PASSIVE
+            },
+            color = when (task.priority) {
+                TaskPriority.LOW -> "#10b981"    // Green
+                TaskPriority.MEDIUM -> "#3b82f6" // Blue  
+                TaskPriority.HIGH -> "#f59e0b"   // Orange
+                TaskPriority.URGENT -> "#ef4444" // Red
             }
         )
         

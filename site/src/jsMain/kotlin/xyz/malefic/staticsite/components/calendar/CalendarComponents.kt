@@ -75,7 +75,7 @@ val CalendarGridStyle =
             .display(DisplayStyle.Grid)
             .styleModifier {
                 property("grid-template-columns", "auto repeat(7, 1fr)")
-                property("grid-template-rows", "auto repeat(24, 80px)") // Increased from 60px to 80px for better event visibility
+                property("grid-template-rows", "auto repeat(48, 40px)") // Changed to 48 30-minute intervals, 40px each
                 property("gap", "1px")
             }.border(1.px, LineStyle.Solid, Color(ThemeManager.Colors.border))
             .borderRadius(8.px)
@@ -114,7 +114,7 @@ val CalendarCellStyle =
         Modifier
             .backgroundColor(Color(ThemeManager.Colors.calendarBackground))
             .border(1.px, LineStyle.Solid, Color(ThemeManager.Colors.border))
-            .minHeight(80.px) // Increased to match grid row height
+            .minHeight(40.px) // Updated to match new 30-minute interval height
             .position(Position.Relative)
             .overflow(Overflow.Visible) // Allow events to overflow when needed
     }
@@ -125,7 +125,7 @@ val CalendarCellDropTargetStyle =
         Modifier
             .backgroundColor(Color("#f0f9ff"))
             .border(1.px, LineStyle.Solid, Color("#3b82f6"))
-            .minHeight(80.px) // Increased to match grid row height
+            .minHeight(40.px) // Updated to match new 30-minute interval height
             .position(Position.Relative)
             .overflow(Overflow.Visible)
     }
@@ -135,7 +135,7 @@ val CalendarEventStyle =
     CssStyle {
         base {
             Modifier
-                .backgroundColor(Color("#3b82f6"))
+                .backgroundColor(Color("#10b981")) // Light green for all events
                 .color(Colors.White)
                 .borderRadius(8.px) // Rounded corners for modern look
                 .padding(6.px, 10.px) // Increased padding for better spacing
@@ -181,10 +181,10 @@ val ActiveEventStyle =
 val PassiveEventStyle =
     CssStyle.base {
         Modifier
-            .backgroundColor(Color("#3b82f6"))
+            .backgroundColor(Color("#10b981")) // Light green for events
             .styleModifier {
                 property("border-left", "3px solid rgba(255,255,255,0.4)")
-                property("background", "linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)")
+                property("background", "linear-gradient(135deg, #10b981 0%, #059669 100%)") // Light green gradient
             }
     }
 
@@ -273,7 +273,7 @@ fun CalendarHeader() {
 }
 
 /**
- * Time column component that displays the hours of the day.
+ * Time column component that displays 30-minute intervals throughout the day.
  */
 @Composable
 fun TimeColumn() {
@@ -281,22 +281,29 @@ fun TimeColumn() {
         // Empty cell for the header row
         Box(Modifier.height(40.px)) {}
 
-        // Hour labels - increased height to match grid rows
-        for (hour in 0..23) {
-            Box(Modifier.height(80.px).padding(top = 8.px)) { // Increased height and padding
-                val formattedHour =
-                    if (hour ==
-                        0
-                    ) {
-                        "12 AM"
-                    } else if (hour < 12) {
-                        "$hour AM"
-                    } else if (hour == 12) {
-                        "12 PM"
-                    } else {
-                        "${hour - 12} PM"
+        // 30-minute interval labels - 48 intervals total (24 hours × 2)
+        for (halfHour in 0..47) {
+            val hour = halfHour / 2
+            val isHalfHour = halfHour % 2 == 1
+            
+            Box(Modifier.height(40.px).padding(top = 4.px)) {
+                if (!isHalfHour) { // Only show hour labels on the hour, not half-hour
+                    val formattedHour = when {
+                        hour == 0 -> "12 AM"
+                        hour < 12 -> "$hour AM"  
+                        hour == 12 -> "12 PM"
+                        else -> "${hour - 12} PM"
                     }
-                SpanText(formattedHour)
+                    SpanText(formattedHour)
+                } else {
+                    // Show :30 for half-hour marks
+                    val baseHour = when {
+                        hour == 0 -> "12"
+                        hour <= 12 -> "$hour"
+                        else -> "${hour - 12}"
+                    }
+                    SpanText("$baseHour:30", Modifier.fontSize(9.px).color(Color(ThemeManager.Colors.secondaryText)))
+                }
             }
         }
     }
@@ -453,13 +460,13 @@ fun CalendarCell(
                                 .padding(6.px, 8.px)
                                 .backgroundColor(
                                     Color(
-                                        if (isSelected) {
-                                            if (ThemeManager.isDarkMode) "#b91c1c" else "#991b1b"
+                                        event.color ?: if (isSelected) {
+                                            if (ThemeManager.isDarkMode) "#059669" else "#10b981"
                                         } else {
-                                            if (ThemeManager.isDarkMode) "#ef4444" else "#dc2626"
+                                            if (ThemeManager.isDarkMode) "#10b981" else "#10b981"
                                         }
                                     )
-                                ) // Red for active events, darker when selected
+                                ) // Use event color if available, otherwise light green, darker when selected
                                 .borderRadius(4.px)
                                 .border(
                                     if (isSelected) 2.px else 0.px,
@@ -520,7 +527,7 @@ fun CalendarCell(
                                 Box(
                                     Modifier
                                         .position(Position.Absolute)
-                                        .top((-40).px)
+                                        .top((-60).px) // Moved further up to avoid overlap
                                         .left(0.px)
                                         .backgroundColor(
                                             Color(if (ThemeManager.isDarkMode) "#2d3748" else "#1f2937")
@@ -531,7 +538,7 @@ fun CalendarCell(
                                         .padding(8.px)
                                         .borderRadius(4.px)
                                         .fontSize(12.px)
-                                        .zIndex(100)
+                                        .zIndex(1000) // Higher z-index to ensure visibility
                                         .styleModifier {
                                             property("box-shadow", "0 2px 8px rgba(0,0,0,0.3)")
                                             property("max-width", "200px")
@@ -630,13 +637,13 @@ fun CalendarCell(
                                 .padding(6.px, 8.px)
                                 .backgroundColor(
                                     Color(
-                                        if (isSelected) {
-                                            if (ThemeManager.isDarkMode) "#1d4ed8" else "#1e40af"
+                                        event.color ?: if (isSelected) {
+                                            if (ThemeManager.isDarkMode) "#059669" else "#10b981"
                                         } else {
-                                            if (ThemeManager.isDarkMode) "#3b82f6" else "#2563eb"
+                                            if (ThemeManager.isDarkMode) "#10b981" else "#10b981"
                                         }
                                     )
-                                ) // Blue for passive events, darker when selected
+                                ) // Use event color if available, otherwise light green, darker when selected
                                 .borderRadius(4.px)
                                 .border(
                                     if (isSelected) 2.px else 0.px,
@@ -703,7 +710,7 @@ fun CalendarCell(
                                 Box(
                                     Modifier
                                         .position(Position.Absolute)
-                                        .top((-45).px) // Adjusted position
+                                        .top((-65).px) // Moved further up to avoid overlap
                                         .left(0.px) // Changed from right to left for better positioning
                                         .backgroundColor(
                                             Color(if (ThemeManager.isDarkMode) "#2d3748" else "#1f2937")
@@ -959,10 +966,10 @@ fun MonthCalendarCell(
                         .fillMaxWidth()
                         .backgroundColor(
                             Color(
-                                if (event.isPassive) {
-                                    if (ThemeManager.isDarkMode) "#3b82f6" else "#2563eb"
+                                event.color ?: if (event.isPassive) {
+                                    if (ThemeManager.isDarkMode) "#10b981" else "#10b981" // Light green for passive events
                                 } else {
-                                    if (ThemeManager.isDarkMode) "#ef4444" else "#dc2626"
+                                    if (ThemeManager.isDarkMode) "#10b981" else "#10b981" // Light green for active events too
                                 }
                             )
                         )
