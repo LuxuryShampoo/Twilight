@@ -30,7 +30,7 @@ object GlobalDragState {
     var draggingId by mutableStateOf<String?>(null)
 }
 
-// Selection state management
+// Selection state management - Enhanced with click-outside support
 object GlobalSelectionState {
     val selectedEventIds = mutableStateListOf<String>()
     
@@ -59,6 +59,12 @@ object GlobalSelectionState {
         selectedEventIds.clear()
         selectedEventIds.addAll(eventIds)
     }
+    
+    // Add method to check if we have multiple selections for drag-all functionality
+    fun hasMultipleSelections(): Boolean = selectedEventIds.size > 1
+    
+    // Get all selected event IDs for operations
+    fun getAllSelected(): List<String> = selectedEventIds.toList()
 }
 
 // Calendar Grid Styles
@@ -69,7 +75,7 @@ val CalendarGridStyle =
             .display(DisplayStyle.Grid)
             .styleModifier {
                 property("grid-template-columns", "auto repeat(7, 1fr)")
-                property("grid-template-rows", "auto repeat(24, 60px)")
+                property("grid-template-rows", "auto repeat(24, 80px)") // Increased from 60px to 80px for better event visibility
                 property("gap", "1px")
             }.border(1.px, LineStyle.Solid, Color(ThemeManager.Colors.border))
             .borderRadius(8.px)
@@ -108,7 +114,7 @@ val CalendarCellStyle =
         Modifier
             .backgroundColor(Color(ThemeManager.Colors.calendarBackground))
             .border(1.px, LineStyle.Solid, Color(ThemeManager.Colors.border))
-            .minHeight(60.px)
+            .minHeight(80.px) // Increased to match grid row height
             .position(Position.Relative)
             .overflow(Overflow.Visible) // Allow events to overflow when needed
     }
@@ -119,59 +125,89 @@ val CalendarCellDropTargetStyle =
         Modifier
             .backgroundColor(Color("#f0f9ff"))
             .border(1.px, LineStyle.Solid, Color("#3b82f6"))
-            .minHeight(60.px)
+            .minHeight(80.px) // Increased to match grid row height
             .position(Position.Relative)
             .overflow(Overflow.Visible)
     }
 
-// Calendar Event Styles
+// Calendar Event Styles - Improved for better aesthetics
 val CalendarEventStyle =
-    CssStyle.base {
-        Modifier
-            .backgroundColor(Color("#3b82f6"))
-            .color(Colors.White)
-            .borderRadius(0.px) // Fix: Add .px unit
-            .padding(4.px, 8.px)
-            .fontSize(12.px)
-            .fontWeight(500)
-            .margin(0.px) // Fix: Add .px unit
-            .overflow(Overflow.Hidden)
-            .styleModifier {
-                property("text-overflow", "ellipsis")
-                property("white-space", "nowrap")
-                property("user-select", "none")
-                property("cursor", "grab")
-                property("transition", "box-shadow 0.2s ease, transform 0.1s ease")
-                property("border-left", "4px solid rgba(255,255,255,0.5)")
-            }.transition(Transition.of("background-color", 0.2.s))
+    CssStyle {
+        base {
+            Modifier
+                .backgroundColor(Color("#3b82f6"))
+                .color(Colors.White)
+                .borderRadius(8.px) // Rounded corners for modern look
+                .padding(6.px, 10.px) // Increased padding for better spacing
+                .fontSize(12.px)
+                .fontWeight(500)
+                .margin(2.px) // Small margin to prevent stacking overlap
+                .overflow(Overflow.Hidden)
+                .styleModifier {
+                    property("text-overflow", "ellipsis")
+                    property("white-space", "nowrap")
+                    property("user-select", "none")
+                    property("cursor", "grab")
+                    property("transition", "all 0.2s ease")
+                    property("border-left", "3px solid rgba(255,255,255,0.3)")
+                    property("box-shadow", "0 2px 4px rgba(0,0,0,0.1)")
+                    property("backdrop-filter", "blur(10px)")
+                    property("min-height", "28px") // Ensure consistent height
+                    property("display", "flex")
+                    property("align-items", "center")
+                }
+        }
+        
+        hover {
+            Modifier.styleModifier {
+                property("transform", "translateY(-1px)")
+                property("box-shadow", "0 4px 8px rgba(0,0,0,0.15)")
+            }
+        }
     }
 
-// Active Event Style
+// Active Event Style - More vibrant red with better contrast
 val ActiveEventStyle =
     CssStyle.base {
         Modifier
-            .backgroundColor(Color("#dc2626"))
+            .backgroundColor(Color("#ef4444"))
+            .styleModifier {
+                property("border-left", "3px solid rgba(255,255,255,0.4)")
+                property("background", "linear-gradient(135deg, #ef4444 0%, #dc2626 100%)")
+            }
     }
 
-// Passive Event Style
+// Passive Event Style - Calming blue gradient
 val PassiveEventStyle =
     CssStyle.base {
         Modifier
             .backgroundColor(Color("#3b82f6"))
+            .styleModifier {
+                property("border-left", "3px solid rgba(255,255,255,0.4)")
+                property("background", "linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)")
+            }
     }
 
-// Custom Event Style
+// Custom Event Style - Purple gradient for distinction
 val CustomEventStyle =
     CssStyle.base {
         Modifier
             .backgroundColor(Color("#8b5cf6"))
+            .styleModifier {
+                property("border-left", "3px solid rgba(255,255,255,0.4)")
+                property("background", "linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)")
+            }
     }
 
-// Holiday Event Style
+// Holiday Event Style - Green gradient for special occasions
 val HolidayEventStyle =
     CssStyle.base {
         Modifier
             .backgroundColor(Color("#10b981"))
+            .styleModifier {
+                property("border-left", "3px solid rgba(255,255,255,0.4)")
+                property("background", "linear-gradient(135deg, #10b981 0%, #059669 100%)")
+            }
     }
 
 // Calendar Navigation Styles
@@ -245,9 +281,9 @@ fun TimeColumn() {
         // Empty cell for the header row
         Box(Modifier.height(40.px)) {}
 
-        // Hour labels
+        // Hour labels - increased height to match grid rows
         for (hour in 0..23) {
-            Box(Modifier.height(60.px).padding(top = 4.px)) {
+            Box(Modifier.height(80.px).padding(top = 8.px)) { // Increased height and padding
                 val formattedHour =
                     if (hour ==
                         0
@@ -658,35 +694,49 @@ fun CalendarCell(
                                     }
                             )
 
-                            // Tooltip for passive events
+                            // Improved Tooltip for passive events - fixes overflow issue
                             if (isHovered && !isDragging) {
                                 Box(
                                     Modifier
                                         .position(Position.Absolute)
-                                        .top((-40).px)
-                                        .right(0.px)
+                                        .top((-45).px) // Adjusted position
+                                        .left(0.px) // Changed from right to left for better positioning
                                         .backgroundColor(
                                             Color(if (ThemeManager.isDarkMode) "#2d3748" else "#1f2937")
                                         )
                                         .color(
                                             Color(if (ThemeManager.isDarkMode) "#e2e8f0" else "#ffffff")
                                         )
-                                        .padding(8.px)
-                                        .borderRadius(4.px)
-                                        .fontSize(12.px)
-                                        .zIndex(100)
+                                        .padding(10.px, 12.px) // Better padding
+                                        .borderRadius(6.px) // Slightly more rounded
+                                        .fontSize(11.px)
+                                        .zIndex(1000) // Higher z-index to ensure visibility
                                         .styleModifier {
-                                            property("box-shadow", "0 2px 8px rgba(0,0,0,0.3)")
-                                            property("max-width", "200px")
+                                            property("box-shadow", "0 4px 12px rgba(0,0,0,0.25)")
+                                            property("max-width", "250px") // Increased max width
+                                            property("min-width", "150px") // Minimum width for consistency
                                             property("word-wrap", "break-word")
+                                            property("white-space", "normal") // Allow text wrapping
                                             property("pointer-events", "none")
+                                            property("border", "1px solid rgba(255,255,255,0.1)")
+                                            // Tooltip arrow
+                                            property("position", "relative")
+                                        }
+                                        .attrsModifier {
+                                            style {
+                                                // CSS-only tooltip arrow
+                                                property("--tooltip-arrow", "8px")
+                                            }
                                         }
                                 ) {
                                     SpanText(
                                         if (event.description.isNotBlank()) {
-                                            "${event.title} (${CalendarUtils.formatTime(event.startTime)} - ${CalendarUtils.formatTime(event.endTime)})\n${event.description}"
+                                            "${event.title}\n${CalendarUtils.formatTime(event.startTime)} - ${CalendarUtils.formatTime(event.endTime)}\n${event.description}"
                                         } else {
-                                            "${event.title} (${CalendarUtils.formatTime(event.startTime)} - ${CalendarUtils.formatTime(event.endTime)})"
+                                            "${event.title}\n${CalendarUtils.formatTime(event.startTime)} - ${CalendarUtils.formatTime(event.endTime)}"
+                                        },
+                                        Modifier.styleModifier {
+                                            property("line-height", "1.4")
                                         }
                                     )
                                 }
