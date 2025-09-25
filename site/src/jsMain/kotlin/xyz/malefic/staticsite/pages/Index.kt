@@ -1093,6 +1093,166 @@ fun HomePage() {
             }
         }
 
+        // Task Creation Dialog - Fixed to properly show when showTaskDialog is true
+        if (showTaskDialog) {
+            Box(
+                modifier =
+                    Modifier
+                        .position(Position.Fixed)
+                        .top(0.px)
+                        .left(0.px)
+                        .right(0.px)
+                        .bottom(0.px)
+                        .backgroundColor(
+                            com.varabyte.kobweb.compose.ui.graphics.Color
+                                .rgba(0f, 0f, 0f, 0.5f),
+                        ).display(DisplayStyle.Flex)
+                        .styleModifier {
+                            property("justify-content", "center")
+                            property("align-items", "center")
+                            property("z-index", "1000")
+                        },
+            ) {
+                Box(
+                    modifier =
+                        Modifier
+                            .backgroundColor(Color(ThemeManager.Colors.calendarBackground))
+                            .padding(24.px)
+                            .borderRadius(8.px)
+                            .maxWidth(400.px)
+                            .width(100.percent),
+                ) {
+                    Column {
+                        SpanText(
+                            "Create New Task",
+                            Modifier
+                                .fontSize(18.px)
+                                .fontWeight(700)
+                                .margin(bottom = 16.px)
+                                .color(Color(ThemeManager.Colors.text)),
+                        )
+
+                        SpanText(
+                            "Title",
+                            Modifier
+                                .fontSize(14.px)
+                                .fontWeight(500)
+                                .margin(bottom = 4.px)
+                                .color(Color(ThemeManager.Colors.text)),
+                        )
+
+                        TextInput(
+                            attrs = {
+                                value(newTaskTitle)
+                                onInput { newTaskTitle = it.value }
+                                style {
+                                    width(100.percent)
+                                    marginBottom(12.px)
+                                    padding(8.px)
+                                    border(1.px, LineStyle.Solid, Color(ThemeManager.Colors.border))
+                                    borderRadius(4.px)
+                                    backgroundColor(Color(ThemeManager.Colors.calendarBackground))
+                                    color(Color(ThemeManager.Colors.text))
+                                }
+                            },
+                        )
+
+                        SpanText(
+                            "Description",
+                            Modifier
+                                .fontSize(14.px)
+                                .fontWeight(500)
+                                .margin(bottom = 4.px)
+                                .color(Color(ThemeManager.Colors.text)),
+                        )
+
+                        TextArea(
+                            attrs = {
+                                value(newTaskDescription)
+                                onInput { newTaskDescription = it.value }
+                                style {
+                                    width(100.percent)
+                                    marginBottom(16.px)
+                                    padding(8.px)
+                                    border(1.px, LineStyle.Solid, Color(ThemeManager.Colors.border))
+                                    borderRadius(4.px)
+                                    backgroundColor(Color(ThemeManager.Colors.calendarBackground))
+                                    color(Color(ThemeManager.Colors.text))
+                                    minHeight(80.px)
+                                    resize(Resize.Vertical)
+                                }
+                            },
+                        )
+
+                        // Action buttons
+                        Row(
+                            modifier =
+                                Modifier
+                                    .fillMaxWidth()
+                                    .styleModifier {
+                                        property("justify-content", "flex-end")
+                                        property("gap", "8px")
+                                    },
+                        ) {
+                            Button(
+                                attrs = {
+                                    onClick {
+                                        showTaskDialog = false
+                                        newTaskTitle = ""
+                                        newTaskDescription = ""
+                                    }
+                                    style {
+                                        padding(8.px, 16.px)
+                                        backgroundColor(Color(ThemeManager.Colors.buttonBackground))
+                                        color(Color(ThemeManager.Colors.buttonText))
+                                        border(1.px, LineStyle.Solid, Color(ThemeManager.Colors.border))
+                                        borderRadius(4.px)
+                                        cursor(Cursor.Pointer)
+                                    }
+                                },
+                            ) {
+                                SpanText("Cancel")
+                            }
+
+                            Button(
+                                attrs = {
+                                    onClick {
+                                        if (newTaskTitle.isNotBlank()) {
+                                            // Create and add the task
+                                            val newTask = WeeklyTask(
+                                                id = "task-${Date().getTime()}",
+                                                title = newTaskTitle,
+                                                description = newTaskDescription,
+                                                estimatedHours = 1,
+                                                priority = TaskPriority.MEDIUM,
+                                                dueDate = null
+                                            )
+                                            tasks.add(newTask)
+                                            
+                                            // Reset form
+                                            showTaskDialog = false
+                                            newTaskTitle = ""
+                                            newTaskDescription = ""
+                                        }
+                                    }
+                                    style {
+                                        padding(8.px, 16.px)
+                                        backgroundColor(Color(ThemeManager.Colors.primaryButton))
+                                        color(Colors.White)
+                                        border(0.px)
+                                        borderRadius(4.px)
+                                        cursor(Cursor.Pointer)
+                                    }
+                                },
+                            ) {
+                                SpanText("Create Task")
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
         // Event Edit Dialog
         if (showEditDialog && editingEvent != null) {
             Box(
