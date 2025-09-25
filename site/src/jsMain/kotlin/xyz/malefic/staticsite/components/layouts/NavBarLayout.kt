@@ -111,7 +111,7 @@ val DropdownContentStyle =
             .position(Position.Absolute)
             .top(100.percent)
             .right(0.px)
-            .background(Color(if (ThemeManager.isDarkMode) "#2C2C2C" else Colors.White.value))
+            .background(Color(if (ThemeManager.isDarkMode) "#2C2C2C" else "#ffffff"))
             .minWidth(180.px)
             .boxShadow(0.px, 8.px, 16.px, color = Kolor.rgba(0f, 0f, 0f, if (ThemeManager.isDarkMode) 0.3f else 0.15f))
             .borderRadius(8.px)

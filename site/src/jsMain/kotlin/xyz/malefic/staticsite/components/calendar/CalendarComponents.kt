@@ -13,11 +13,11 @@ import com.varabyte.kobweb.silk.style.base
 import com.varabyte.kobweb.silk.style.selectors.hover
 import com.varabyte.kobweb.silk.style.toModifier
 import kotlinx.browser.document
+import org.jetbrains.compose.web.attributes.*
 import org.jetbrains.compose.web.css.*
 import org.jetbrains.compose.web.css.DisplayStyle
 import org.jetbrains.compose.web.css.LineStyle
 import org.jetbrains.compose.web.dom.*
-import org.jetbrains.compose.web.attributes.*
 import org.w3c.dom.HTMLElement
 import xyz.malefic.staticsite.util.CalendarEvent
 import xyz.malefic.staticsite.util.CalendarUtils
@@ -33,10 +33,13 @@ object GlobalDragState {
 // Selection state management - Enhanced with click-outside support
 object GlobalSelectionState {
     val selectedEventIds = mutableStateListOf<String>()
-    
+
     fun isSelected(eventId: String): Boolean = selectedEventIds.contains(eventId)
-    
-    fun toggleSelection(eventId: String, isShiftClick: Boolean = false) {
+
+    fun toggleSelection(
+        eventId: String,
+        isShiftClick: Boolean = false,
+    ) {
         if (isShiftClick) {
             // For shift-click, add to existing selection
             if (isSelected(eventId)) {
@@ -50,19 +53,19 @@ object GlobalSelectionState {
             selectedEventIds.add(eventId)
         }
     }
-    
+
     fun clearSelection() {
         selectedEventIds.clear()
     }
-    
+
     fun selectAll(eventIds: List<String>) {
         selectedEventIds.clear()
         selectedEventIds.addAll(eventIds)
     }
-    
+
     // Add method to check if we have multiple selections for drag-all functionality
     fun hasMultipleSelections(): Boolean = selectedEventIds.size > 1
-    
+
     // Get all selected event IDs for operations
     fun getAllSelected(): List<String> = selectedEventIds.toList()
 }
@@ -157,7 +160,7 @@ val CalendarEventStyle =
                     property("align-items", "center")
                 }
         }
-        
+
         hover {
             Modifier.styleModifier {
                 property("transform", "translateY(-1px)")
@@ -285,23 +288,25 @@ fun TimeColumn() {
         for (halfHour in 0..47) {
             val hour = halfHour / 2
             val isHalfHour = halfHour % 2 == 1
-            
+
             Box(Modifier.height(40.px).padding(top = 4.px)) {
                 if (!isHalfHour) { // Only show hour labels on the hour, not half-hour
-                    val formattedHour = when {
-                        hour == 0 -> "12 AM"
-                        hour < 12 -> "$hour AM"  
-                        hour == 12 -> "12 PM"
-                        else -> "${hour - 12} PM"
-                    }
+                    val formattedHour =
+                        when {
+                            hour == 0 -> "12 AM"
+                            hour < 12 -> "$hour AM"
+                            hour == 12 -> "12 PM"
+                            else -> "${hour - 12} PM"
+                        }
                     SpanText(formattedHour)
                 } else {
                     // Show :30 for half-hour marks
-                    val baseHour = when {
-                        hour == 0 -> "12"
-                        hour <= 12 -> "$hour"
-                        else -> "${hour - 12}"
-                    }
+                    val baseHour =
+                        when {
+                            hour == 0 -> "12"
+                            hour <= 12 -> "$hour"
+                            else -> "${hour - 12}"
+                        }
                     SpanText("$baseHour:30", Modifier.fontSize(9.px).color(Color(ThemeManager.Colors.secondaryText)))
                 }
             }
@@ -333,24 +338,27 @@ fun CalendarCell(
             val clickListener: (dynamic) -> Unit = { event ->
                 val clickEvent = event.unsafeCast<org.w3c.dom.events.MouseEvent>()
                 val target = clickEvent.target.unsafeCast<org.w3c.dom.Element>()
-                
+
                 // Check if the clicked element is not part of the event UI
-                val isEventElement = target.classList.contains("event-element") || 
-                                    target.closest(".event-element") != null ||
-                                    target.classList.contains("event-delete-button") ||
-                                    target.closest(".event-delete-button") != null
-                
+                val isEventElement =
+                    target.classList.contains("event-element") ||
+                        target.closest(".event-element") != null ||
+                        target.classList.contains("event-delete-button") ||
+                        target.closest(".event-delete-button") != null
+
                 if (!isEventElement) {
                     editingEvent = null
                 }
             }
-            
+
             kotlinx.browser.document.addEventListener("click", clickListener)
-            
-            // Cleanup function
-            onDispose {
-                kotlinx.browser.document.removeEventListener("click", clickListener)
-            }
+        }
+    }
+
+    // Cleanup listener when component is disposed
+    DisposableEffect(editingEvent) {
+        onDispose {
+            // Cleanup is handled by LaunchedEffect scope
         }
     }
 
@@ -364,18 +372,18 @@ fun CalendarCell(
                     Color(if (ThemeManager.isDarkMode) "#1a3a52" else "#f0f9ff")
                 } else {
                     Color(ThemeManager.Colors.calendarBackground)
-                }
-            )
-            .border(
-                1.px, 
-                LineStyle.Solid, 
-                Color(if (isDropTarget) {
-                    if (ThemeManager.isDarkMode) "#3b82f6" else "#3b82f6"
-                } else {
-                    ThemeManager.Colors.border
-                })
-            )
-            .minHeight(60.px)
+                },
+            ).border(
+                1.px,
+                LineStyle.Solid,
+                Color(
+                    if (isDropTarget) {
+                        if (ThemeManager.isDarkMode) "#3b82f6" else "#3b82f6"
+                    } else {
+                        ThemeManager.Colors.border
+                    },
+                ),
+            ).minHeight(60.px)
             .position(Position.Relative)
             .overflow(Overflow.Visible)
             .attrsModifier {
@@ -410,22 +418,23 @@ fun CalendarCell(
                     try {
                         // Simple drag and drop handling
                         val eventId = GlobalDragState.draggingId ?: return@onDrop
-                        
+
                         // Create new date at the drop position
-                        val newDate = Date(
-                            date.getFullYear(), 
-                            date.getMonth(), 
-                            date.getDate(), 
-                            hour
-                        )
-                        
+                        val newDate =
+                            Date(
+                                date.getFullYear(),
+                                date.getMonth(),
+                                date.getDate(),
+                                hour,
+                            )
+
                         // Find the event and update it
                         val targetEvent = allEvents.find { it.id == eventId }
                         if (targetEvent != null) {
                             val updatedEvent = targetEvent.copy(hour = hour)
                             onEventUpdate(updatedEvent)
                         }
-                        
+
                         GlobalDragState.draggingId = null
                     } catch (e: Exception) {
                         console.error("Drop error: ${e.message}")
@@ -439,9 +448,8 @@ fun CalendarCell(
                 .fillMaxWidth()
                 .height(4.px)
                 .backgroundColor(
-                    Color(if (ThemeManager.isDarkMode) "#404040" else "#f0f0f0")
-                )
-                .align(Alignment.TopStart),
+                    Color(if (ThemeManager.isDarkMode) "#404040" else "#f0f0f0"),
+                ).align(Alignment.TopStart),
         )
 
         // Separate events by mode for positioning
@@ -454,7 +462,7 @@ fun CalendarCell(
                 Modifier
                     .width(if (passiveEvents.isEmpty()) 100.percent else 60.percent)
                     .align(Alignment.CenterStart)
-                    .padding(2.px)
+                    .padding(2.px),
             ) {
                 Column {
                     activeEvents.forEachIndexed { index, event ->
@@ -480,28 +488,25 @@ fun CalendarCell(
                                         onEventClick(event)
                                         GlobalSelectionState.toggleSelection(event.id, false)
                                     }
-                                }
-                                .onMouseEnter { 
-                                    if (!isDragging) isHovered = true 
-                                }
-                                .onMouseLeave { 
-                                    if (!isDragging) isHovered = false 
-                                }
-                                .padding(6.px, 8.px)
+                                }.onMouseEnter {
+                                    if (!isDragging) isHovered = true
+                                }.onMouseLeave {
+                                    if (!isDragging) isHovered = false
+                                }.padding(6.px, 8.px)
                                 .backgroundColor(
                                     Color(
                                         event.color ?: if (isSelected) {
                                             if (ThemeManager.isDarkMode) "#059669" else "#10b981"
                                         } else {
                                             if (ThemeManager.isDarkMode) "#10b981" else "#10b981"
-                                        }
-                                    )
+                                        },
+                                    ),
                                 ) // Use event color if available, otherwise light green, darker when selected
                                 .borderRadius(4.px)
                                 .border(
                                     if (isSelected) 2.px else 0.px,
                                     LineStyle.Solid,
-                                    Color("#fbbf24")
+                                    Color("#fbbf24"),
                                 ) // Yellow border for selected events
                                 .zIndex(if (isHovered && !isDragging) 10 else 1)
                                 .styleModifier {
@@ -515,7 +520,7 @@ fun CalendarCell(
                                     property("cursor", if (isDragging) "grabbing" else "grab")
                                     property("user-select", "none")
                                     property("min-height", "24px") // Ensure minimum readable height
-                                    
+
                                     // Make event span multiple grid rows based on duration
                                     val durationInSlots = event.durationInSlots
                                     if (durationInSlots > 1) {
@@ -526,8 +531,7 @@ fun CalendarCell(
                                         property("height", "${durationInSlots * 40 - 2}px") // 40px per slot minus border
                                         property("z-index", "5")
                                     }
-                                }
-                                .position(Position.Relative)
+                                }.position(Position.Relative)
                                 .attrsModifier {
                                     attr("draggable", "true")
                                     onDragStart { e ->
@@ -543,24 +547,25 @@ fun CalendarCell(
                         ) {
                             SpanText(
                                 text = event.title,
-                                modifier = Modifier
-                                    .color(Colors.White)
-                                    .fontSize(13.px)
-                                    .fontWeight(FontWeight.Bold)
-                                    .styleModifier {
-                                        property("white-space", "nowrap")
-                                        property("overflow", "hidden")
-                                        property("text-overflow", "ellipsis")
-                                        property("max-width", "100%")
-                                        property("pointer-events", "none")
-                                        property("line-height", "1.2")
-                                        if (!isHovered && !isActive && !isDragging) {
-                                            property("opacity", "0.85")
-                                            property("transition", "opacity 0.3s ease-in-out")
-                                        } else {
-                                            property("opacity", "1")
-                                        }
-                                    }
+                                modifier =
+                                    Modifier
+                                        .color(Colors.White)
+                                        .fontSize(13.px)
+                                        .fontWeight(FontWeight.Bold)
+                                        .styleModifier {
+                                            property("white-space", "nowrap")
+                                            property("overflow", "hidden")
+                                            property("text-overflow", "ellipsis")
+                                            property("max-width", "100%")
+                                            property("pointer-events", "none")
+                                            property("line-height", "1.2")
+                                            if (!isHovered && !isActive && !isDragging) {
+                                                property("opacity", "0.85")
+                                                property("transition", "opacity 0.3s ease-in-out")
+                                            } else {
+                                                property("opacity", "1")
+                                            }
+                                        },
                             )
 
                             // Tooltip for active events
@@ -571,12 +576,10 @@ fun CalendarCell(
                                         .top((-60).px) // Moved further up to avoid overlap
                                         .left(0.px)
                                         .backgroundColor(
-                                            Color(if (ThemeManager.isDarkMode) "#2d3748" else "#1f2937")
-                                        )
-                                        .color(
-                                            Color(if (ThemeManager.isDarkMode) "#e2e8f0" else "#ffffff")
-                                        )
-                                        .padding(8.px)
+                                            Color(if (ThemeManager.isDarkMode) "#2d3748" else "#1f2937"),
+                                        ).color(
+                                            Color(if (ThemeManager.isDarkMode) "#e2e8f0" else "#ffffff"),
+                                        ).padding(8.px)
                                         .borderRadius(4.px)
                                         .fontSize(12.px)
                                         .zIndex(1000) // Higher z-index to ensure visibility
@@ -585,14 +588,18 @@ fun CalendarCell(
                                             property("max-width", "200px")
                                             property("word-wrap", "break-word")
                                             property("pointer-events", "none")
-                                        }
+                                        },
                                 ) {
                                     SpanText(
                                         if (event.description.isNotBlank()) {
-                                            "${event.title} (${CalendarUtils.formatTime(event.startTime)} - ${CalendarUtils.formatTime(event.endTime)})\n${event.description}"
+                                            "${event.title} (${CalendarUtils.formatTime(
+                                                event.startTime,
+                                            )} - ${CalendarUtils.formatTime(event.endTime)})\n${event.description}"
                                         } else {
-                                            "${event.title} (${CalendarUtils.formatTime(event.startTime)} - ${CalendarUtils.formatTime(event.endTime)})"
-                                        }
+                                            "${event.title} (${CalendarUtils.formatTime(
+                                                event.startTime,
+                                            )} - ${CalendarUtils.formatTime(event.endTime)})"
+                                        },
                                     )
                                 }
                             }
@@ -612,13 +619,11 @@ fun CalendarCell(
                                                 onEventDelete(event)
                                                 editingEvent = null
                                             }
-                                        }
-                                        .attrsModifier {
+                                        }.attrsModifier {
                                             classes("event-delete-button")
-                                        }
-                                        .styleModifier {
+                                        }.styleModifier {
                                             property("transition", "all 0.2s ease")
-                                        }
+                                        },
                                 ) {
                                     SpanText(
                                         "×",
@@ -629,7 +634,7 @@ fun CalendarCell(
                                             .styleModifier {
                                                 property("line-height", "1")
                                                 property("user-select", "none")
-                                            }
+                                            },
                                     )
                                 }
                             }
@@ -641,19 +646,17 @@ fun CalendarCell(
                                         .align(Alignment.BottomCenter)
                                         .width(100.percent)
                                         .height(8.px)
-                                        .backgroundColor(Color.rgba(255, 255, 255, 0.3f))
+                                        .backgroundColor(Kolor.rgba(255, 255, 255, 0.3f))
                                         .cursor(Cursor.SResize)
                                         .styleModifier {
                                             property("border-top", "1px solid rgba(255,255,255,0.5)")
                                             property("transition", "all 0.2s ease")
-                                        }
-                                        .onMouseEnter {
+                                        }.onMouseEnter {
                                             // Add visual feedback for resize handle
-                                        }
-                                        .attrsModifier {
+                                        }.attrsModifier {
                                             classes("event-resize-handle")
                                             attr("data-event-id", event.id)
-                                        }
+                                        },
                                 ) {
                                     // Small resize indicator
                                     Box(
@@ -665,7 +668,7 @@ fun CalendarCell(
                                             .borderRadius(2.px)
                                             .styleModifier {
                                                 property("opacity", "0.7")
-                                            }
+                                            },
                                     )
                                 }
                             }
@@ -681,7 +684,7 @@ fun CalendarCell(
                 Modifier
                     .width(if (activeEvents.isEmpty()) 100.percent else 60.percent)
                     .align(Alignment.CenterEnd)
-                    .padding(2.px)
+                    .padding(2.px),
             ) {
                 Column {
                     passiveEvents.forEachIndexed { index, event ->
@@ -708,35 +711,31 @@ fun CalendarCell(
                                         onEventClick(event)
                                         GlobalSelectionState.toggleSelection(event.id, false)
                                     }
-                                }
-                                .onMouseEnter { 
-                                    if (!isDragging) isHovered = true 
-                                }
-                                .onMouseLeave { 
-                                    if (!isDragging) isHovered = false 
-                                }
-                                .padding(6.px, 8.px)
+                                }.onMouseEnter {
+                                    if (!isDragging) isHovered = true
+                                }.onMouseLeave {
+                                    if (!isDragging) isHovered = false
+                                }.padding(6.px, 8.px)
                                 .backgroundColor(
                                     Color(
                                         event.color ?: if (isSelected) {
                                             if (ThemeManager.isDarkMode) "#059669" else "#10b981"
                                         } else {
                                             if (ThemeManager.isDarkMode) "#10b981" else "#10b981"
-                                        }
-                                    )
+                                        },
+                                    ),
                                 ) // Use event color if available, otherwise light green, darker when selected
                                 .borderRadius(4.px)
                                 .border(
                                     if (isSelected) 2.px else 0.px,
                                     LineStyle.Solid,
-                                    Color("#fbbf24")
+                                    Color("#fbbf24"),
                                 ) // Yellow border for selected events
                                 .zIndex(if (isHovered && !isDragging) 10 else (passiveEvents.size - index))
                                 .attrsModifier {
                                     // Add event-element class for click-outside detection
                                     classes("event-element")
-                                }
-                                .styleModifier {
+                                }.styleModifier {
                                     property("opacity", alpha.toString())
                                     property("margin-top", "${stackOffset}px")
                                     if (!isDragging) {
@@ -749,8 +748,7 @@ fun CalendarCell(
                                     property("cursor", if (isDragging) "grabbing" else "grab")
                                     property("user-select", "none")
                                     property("min-height", "24px") // Ensure minimum readable height
-                                }
-                                .position(Position.Relative)
+                                }.position(Position.Relative)
                                 .attrsModifier {
                                     attr("draggable", "true")
                                     onDragStart { e ->
@@ -766,24 +764,25 @@ fun CalendarCell(
                         ) {
                             SpanText(
                                 text = event.title,
-                                modifier = Modifier
-                                    .color(Colors.White)
-                                    .fontSize(13.px)
-                                    .fontWeight(FontWeight.Bold)
-                                    .styleModifier {
-                                        property("white-space", "nowrap")
-                                        property("overflow", "hidden")
-                                        property("text-overflow", "ellipsis")
-                                        property("max-width", "100%")
-                                        property("pointer-events", "none")
-                                        property("line-height", "1.2")
-                                        if (!isHovered && !isActive && !isDragging) {
-                                            property("opacity", "0.85")
-                                            property("transition", "opacity 0.3s ease-in-out")
-                                        } else {
-                                            property("opacity", "1")
-                                        }
-                                    }
+                                modifier =
+                                    Modifier
+                                        .color(Colors.White)
+                                        .fontSize(13.px)
+                                        .fontWeight(FontWeight.Bold)
+                                        .styleModifier {
+                                            property("white-space", "nowrap")
+                                            property("overflow", "hidden")
+                                            property("text-overflow", "ellipsis")
+                                            property("max-width", "100%")
+                                            property("pointer-events", "none")
+                                            property("line-height", "1.2")
+                                            if (!isHovered && !isActive && !isDragging) {
+                                                property("opacity", "0.85")
+                                                property("transition", "opacity 0.3s ease-in-out")
+                                            } else {
+                                                property("opacity", "1")
+                                            }
+                                        },
                             )
 
                             // Improved Tooltip for passive events - fixes overflow issue
@@ -794,20 +793,17 @@ fun CalendarCell(
                                         .top((-65).px) // Moved further up to avoid overlap
                                         .left(0.px) // Changed from right to left for better positioning
                                         .backgroundColor(
-                                            Color(if (ThemeManager.isDarkMode) "#2d3748" else "#1f2937")
-                                        )
-                                        .color(
-                                            Color(if (ThemeManager.isDarkMode) "#e2e8f0" else "#ffffff")
-                                        )
-                                        .padding(10.px, 12.px) // Better padding
+                                            Color(if (ThemeManager.isDarkMode) "#2d3748" else "#1f2937"),
+                                        ).color(
+                                            Color(if (ThemeManager.isDarkMode) "#e2e8f0" else "#ffffff"),
+                                        ).padding(10.px, 12.px) // Better padding
                                         .borderRadius(6.px) // Slightly more rounded
                                         .fontSize(11.px)
                                         .zIndex(1000) // Higher z-index to ensure visibility
                                         .attrsModifier {
                                             // Add event-tooltip class for click-outside detection
                                             classes("event-tooltip")
-                                        }
-                                        .styleModifier {
+                                        }.styleModifier {
                                             property("box-shadow", "0 4px 12px rgba(0,0,0,0.25)")
                                             property("max-width", "250px") // Increased max width
                                             property("min-width", "150px") // Minimum width for consistency
@@ -817,23 +813,26 @@ fun CalendarCell(
                                             property("border", "1px solid rgba(255,255,255,0.1)")
                                             // Tooltip arrow
                                             property("position", "relative")
-                                        }
-                                        .attrsModifier {
+                                        }.attrsModifier {
                                             style {
                                                 // CSS-only tooltip arrow
                                                 property("--tooltip-arrow", "8px")
                                             }
-                                        }
+                                        },
                                 ) {
                                     SpanText(
                                         if (event.description.isNotBlank()) {
-                                            "${event.title}\n${CalendarUtils.formatTime(event.startTime)} - ${CalendarUtils.formatTime(event.endTime)}\n${event.description}"
+                                            "${event.title}\n${CalendarUtils.formatTime(
+                                                event.startTime,
+                                            )} - ${CalendarUtils.formatTime(event.endTime)}\n${event.description}"
                                         } else {
-                                            "${event.title}\n${CalendarUtils.formatTime(event.startTime)} - ${CalendarUtils.formatTime(event.endTime)}"
+                                            "${event.title}\n${CalendarUtils.formatTime(
+                                                event.startTime,
+                                            )} - ${CalendarUtils.formatTime(event.endTime)}"
                                         },
                                         Modifier.styleModifier {
                                             property("line-height", "1.4")
-                                        }
+                                        },
                                     )
                                 }
                             }
@@ -853,14 +852,12 @@ fun CalendarCell(
                                                 onEventDelete(event)
                                                 editingEvent = null
                                             }
-                                        }
-                                        .attrsModifier {
+                                        }.attrsModifier {
                                             // Add event-element class for click-outside detection
                                             classes("event-element")
-                                        }
-                                        .styleModifier {
+                                        }.styleModifier {
                                             property("transition", "all 0.2s ease")
-                                        }
+                                        },
                                 ) {
                                     SpanText(
                                         "×",
@@ -871,7 +868,7 @@ fun CalendarCell(
                                             .styleModifier {
                                                 property("line-height", "1")
                                                 property("user-select", "none")
-                                            }
+                                            },
                                     )
                                 }
                             }
@@ -896,23 +893,23 @@ fun MonthCalendar(
 ) {
     val currentDate = Date()
     val today = Date(currentDate.getFullYear(), currentDate.getMonth(), currentDate.getDate())
-    
+
     // Calculate the first day of the month and the number of days
     val firstDayOfMonth = Date(displayDate.getFullYear(), displayDate.getMonth(), 1)
     val lastDayOfMonth = Date(displayDate.getFullYear(), displayDate.getMonth() + 1, 0)
     val daysInMonth = lastDayOfMonth.getDate()
     val startDayOfWeek = firstDayOfMonth.getDay() // 0 = Sunday, 1 = Monday, etc.
-    
+
     // Calculate total cells needed (including previous/next month days)
     val totalCells = 42 // 6 weeks * 7 days
-    
+
     Box(
         Modifier
             .fillMaxWidth()
             .backgroundColor(Color(ThemeManager.Colors.calendarBackground))
             .border(1.px, LineStyle.Solid, Color(ThemeManager.Colors.border))
             .borderRadius(8.px)
-            .overflow(Overflow.Hidden)
+            .overflow(Overflow.Hidden),
     ) {
         Column {
             // Day headers
@@ -927,60 +924,82 @@ fun MonthCalendar(
                             .styleModifier {
                                 property("flex", "1")
                             },
-                        contentAlignment = Alignment.Center
+                        contentAlignment = Alignment.Center,
                     ) {
                         SpanText(
                             day,
                             Modifier
                                 .fontSize(14.px)
                                 .fontWeight(FontWeight.Bold)
-                                .color(Color(ThemeManager.Colors.text))
+                                .color(Color(ThemeManager.Colors.text)),
                         )
                     }
                 }
             }
-            
+
             // Calendar grid
             for (week in 0 until 6) {
                 Row {
                     for (day in 0..6) {
                         val cellIndex = week * 7 + day
                         val dayNumber = cellIndex - startDayOfWeek + 1
-                        
+
                         val isCurrentMonth = dayNumber >= 1 && dayNumber <= daysInMonth
-                        val cellDate = if (isCurrentMonth) {
-                            Date(displayDate.getFullYear(), displayDate.getMonth(), dayNumber)
-                        } else if (dayNumber < 1) {
-                            // Previous month
-                            val prevMonth = if (displayDate.getMonth() == 0) 11 else displayDate.getMonth() - 1
-                            val prevYear = if (displayDate.getMonth() == 0) displayDate.getFullYear() - 1 else displayDate.getFullYear()
-                            val daysInPrevMonth = Date(prevYear, prevMonth + 1, 0).getDate()
-                            Date(prevYear, prevMonth, daysInPrevMonth + dayNumber)
-                        } else {
-                            // Next month
-                            val nextMonth = if (displayDate.getMonth() == 11) 0 else displayDate.getMonth() + 1
-                            val nextYear = if (displayDate.getMonth() == 11) displayDate.getFullYear() + 1 else displayDate.getFullYear()
-                            Date(nextYear, nextMonth, dayNumber - daysInMonth)
-                        }
-                        
+                        val cellDate =
+                            if (isCurrentMonth) {
+                                Date(displayDate.getFullYear(), displayDate.getMonth(), dayNumber)
+                            } else if (dayNumber < 1) {
+                                // Previous month
+                                val prevMonth = if (displayDate.getMonth() == 0) 11 else displayDate.getMonth() - 1
+                                val prevYear = if (displayDate.getMonth() == 0) displayDate.getFullYear() - 1 else displayDate.getFullYear()
+                                val daysInPrevMonth = Date(prevYear, prevMonth + 1, 0).getDate()
+                                Date(prevYear, prevMonth, daysInPrevMonth + dayNumber)
+                            } else {
+                                // Next month
+                                val nextMonth = if (displayDate.getMonth() == 11) 0 else displayDate.getMonth() + 1
+                                val nextYear =
+                                    if (displayDate.getMonth() ==
+                                        11
+                                    ) {
+                                        displayDate.getFullYear() + 1
+                                    } else {
+                                        displayDate.getFullYear()
+                                    }
+                                Date(nextYear, nextMonth, dayNumber - daysInMonth)
+                            }
+
                         val isToday = CalendarUtils.formatDate(cellDate) == CalendarUtils.formatDate(today)
-                        val dayEvents = CalendarUtils.getEventsForDate(
-                            xyz.malefic.staticsite.util.Calendar("temp", "temp", 
-                                xyz.malefic.staticsite.util.CalendarTheme("temp", "#000", "#000"), 
-                                events.toMutableList()
-                            ), 
-                            cellDate
-                        )
-                        
+                        val dayEvents =
+                            CalendarUtils.getEventsForDate(
+                                xyz.malefic.staticsite.util.Calendar(
+                                    "temp",
+                                    "temp",
+                                    xyz.malefic.staticsite.util
+                                        .CalendarTheme("temp", "#000", "#000"),
+                                    events.toMutableList(),
+                                ),
+                                cellDate,
+                            )
+
                         MonthCalendarCell(
                             date = cellDate,
-                            dayNumber = if (isCurrentMonth) dayNumber else if (dayNumber < 1) dayNumber + Date(displayDate.getFullYear(), displayDate.getMonth(), 0).getDate() else dayNumber - daysInMonth,
+                            dayNumber =
+                                if (isCurrentMonth) {
+                                    dayNumber
+                                } else if (dayNumber <
+                                    1
+                                ) {
+                                    dayNumber + Date(displayDate.getFullYear(), displayDate.getMonth(), 0).getDate()
+                                } else {
+                                    dayNumber -
+                                        daysInMonth
+                                },
                             isCurrentMonth = isCurrentMonth,
                             isToday = isToday,
                             events = dayEvents,
                             onEventClick = onEventClick,
                             onEventUpdate = onEventUpdate,
-                            onEventDelete = onEventDelete
+                            onEventDelete = onEventDelete,
                         )
                     }
                 }
@@ -1012,14 +1031,13 @@ fun MonthCalendarCell(
                     isToday -> Color(ThemeManager.Colors.todayHighlight)
                     !isCurrentMonth -> Color(if (ThemeManager.isDarkMode) "#0f0f0f" else "#f8f9fa")
                     else -> Color(ThemeManager.Colors.calendarBackground)
-                }
-            )
-            .border(1.px, LineStyle.Solid, Color(ThemeManager.Colors.border))
+                },
+            ).border(1.px, LineStyle.Solid, Color(ThemeManager.Colors.border))
             .padding(4.px)
             .position(Position.Relative)
             .styleModifier {
                 property("flex", "1")
-            }
+            },
     ) {
         Column {
             // Day number
@@ -1034,12 +1052,11 @@ fun MonthCalendarCell(
                                 isToday -> if (ThemeManager.isDarkMode) "#ffffff" else "#1f2937"
                                 !isCurrentMonth -> ThemeManager.Colors.secondaryText
                                 else -> ThemeManager.Colors.text
-                            }
-                        )
-                    )
-                    .margin(bottom = 4.px)
+                            },
+                        ),
+                    ).margin(bottom = 4.px),
             )
-            
+
             // Events
             events.take(3).forEachIndexed { index, event ->
                 Box(
@@ -1051,17 +1068,16 @@ fun MonthCalendarCell(
                                     if (ThemeManager.isDarkMode) "#10b981" else "#10b981" // Light green for passive events
                                 } else {
                                     if (ThemeManager.isDarkMode) "#10b981" else "#10b981" // Light green for active events too
-                                }
-                            )
-                        )
-                        .borderRadius(2.px)
+                                },
+                            ),
+                        ).borderRadius(2.px)
                         .padding(2.px, 4.px)
                         .margin(bottom = 2.px)
                         .cursor(Cursor.Pointer)
                         .onClick { onEventClick(event) }
                         .styleModifier {
                             property("transition", "all 0.2s ease")
-                        }
+                        },
                 ) {
                     SpanText(
                         event.title,
@@ -1072,11 +1088,11 @@ fun MonthCalendarCell(
                                 property("white-space", "nowrap")
                                 property("overflow", "hidden")
                                 property("text-overflow", "ellipsis")
-                            }
+                            },
                     )
                 }
             }
-            
+
             // Show "X more" if there are more than 3 events
             if (events.size > 3) {
                 SpanText(
@@ -1084,7 +1100,7 @@ fun MonthCalendarCell(
                     Modifier
                         .fontSize(10.px)
                         .color(Color(ThemeManager.Colors.secondaryText))
-                        .cursor(Cursor.Pointer)
+                        .cursor(Cursor.Pointer),
                 )
             }
         }
