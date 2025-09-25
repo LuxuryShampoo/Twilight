@@ -1270,8 +1270,8 @@ fun SettingsPage() {
                                 Input(
                                     type = InputType.Range,
                                     attrs = {
-                                        attr("min", "30")
-                                        attr("max", "120")
+                                        attr("min", "0")
+                                        attr("max", "180")
                                         attr("step", "15")
                                         attr("value", "60")
                                         style {
