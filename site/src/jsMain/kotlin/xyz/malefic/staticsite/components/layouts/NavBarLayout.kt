@@ -32,6 +32,7 @@ import org.jetbrains.compose.web.css.*
 import org.jetbrains.compose.web.dom.Div
 import org.jetbrains.compose.web.dom.Text
 import xyz.malefic.staticsite.util.Pages
+import xyz.malefic.staticsite.util.ThemeManager
 import com.varabyte.kobweb.compose.ui.graphics.Color as Kolor
 
 // Silk-themed styles
@@ -46,14 +47,20 @@ val NavBarStyle =
                         linearGradient(
                             LinearGradient.Direction.ToRight,
                         ) {
-                            add(Color("#f8f9fa"), 0.percent)
-                            add(Color("#e9ecef"), 50.percent)
-                            add(Color("#dee2e6"), 100.percent)
+                            if (ThemeManager.isDarkMode) {
+                                add(Color("#2C2C2C"), 0.percent)
+                                add(Color("#3D3D3D"), 50.percent)
+                                add(Color("#4A4A4A"), 100.percent)
+                            } else {
+                                add(Color("#f8f9fa"), 0.percent)
+                                add(Color("#e9ecef"), 50.percent)
+                                add(Color("#dee2e6"), 100.percent)
+                            }
                         },
                     ),
                 ),
-            ).boxShadow(0.px, 2.px, 4.px, color = Kolor.rgba(0f, 0f, 0f, 0.1f))
-            .borderBottom(1.px, LineStyle.Solid, Color("#dee2e6"))
+            ).boxShadow(0.px, 2.px, 4.px, color = Kolor.rgba(0f, 0f, 0f, if (ThemeManager.isDarkMode) 0.3f else 0.1f))
+            .borderBottom(1.px, LineStyle.Solid, Color(if (ThemeManager.isDarkMode) "#3D3D3D" else "#dee2e6"))
     }
 
 val NavItemStyle =
@@ -63,7 +70,7 @@ val NavItemStyle =
         .borderRadius(6.px)
         .styleModifier {
             textDecoration("none")
-        }.color(Color("#495057"))
+        }.color(Color(if (ThemeManager.isDarkMode) "#E0E0E0" else "#495057"))
         .fontSize(14.px)
         .fontWeight(500)
         .transition(Transition.all(0.2.s))
@@ -77,8 +84,8 @@ val NavItemHoverStyle =
 
         hover {
             Modifier
-                .background(Kolor.rgba(108f, 117f, 125f, 0.1f))
-                .color(Color("#212529"))
+                .background(Kolor.rgba(108f, 117f, 125f, if (ThemeManager.isDarkMode) 0.2f else 0.1f))
+                .color(Color(if (ThemeManager.isDarkMode) "#FFFFFF" else "#212529"))
                 .translateY((-1).px)
         }
     }
@@ -104,11 +111,11 @@ val DropdownContentStyle =
             .position(Position.Absolute)
             .top(100.percent)
             .right(0.px)
-            .background(Colors.White)
+            .background(Color(if (ThemeManager.isDarkMode) "#2C2C2C" else Colors.White.value))
             .minWidth(180.px)
-            .boxShadow(0.px, 8.px, 16.px, color = Kolor.rgba(0f, 0f, 0f, 0.15f))
+            .boxShadow(0.px, 8.px, 16.px, color = Kolor.rgba(0f, 0f, 0f, if (ThemeManager.isDarkMode) 0.3f else 0.15f))
             .borderRadius(8.px)
-            .border(1.px, LineStyle.Solid, Color("#dee2e6"))
+            .border(1.px, LineStyle.Solid, Color(if (ThemeManager.isDarkMode) "#3D3D3D" else "#dee2e6"))
             .zIndex(1000)
             .padding(8.px, 0.px)
     }
@@ -119,7 +126,7 @@ val DropdownItemStyle =
         .padding(10.px, 16.px)
         .styleModifier {
             textDecoration("none")
-        }.color(Color("#495057"))
+        }.color(Color(if (ThemeManager.isDarkMode) "#E0E0E0" else "#495057"))
         .fontSize(14.px)
         .transition(Transition.of("background-color", 0.15.s))
         .whiteSpace(WhiteSpace.NoWrap)
@@ -131,7 +138,7 @@ val DropdownItemHoverStyle =
         }
 
         hover {
-            Modifier.background(Color("#f8f9fa"))
+            Modifier.background(Color(if (ThemeManager.isDarkMode) "#3D3D3D" else "#f8f9fa"))
         }
     }
 

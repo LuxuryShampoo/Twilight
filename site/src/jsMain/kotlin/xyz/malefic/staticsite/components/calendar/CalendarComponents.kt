@@ -327,6 +327,33 @@ fun CalendarCell(
     // Drop highlight state
     var isDropTarget by remember { mutableStateOf(false) }
 
+    // Click-outside listener to clear editing state
+    LaunchedEffect(editingEvent) {
+        if (editingEvent != null) {
+            val clickListener: (dynamic) -> Unit = { event ->
+                val clickEvent = event.unsafeCast<org.w3c.dom.events.MouseEvent>()
+                val target = clickEvent.target.unsafeCast<org.w3c.dom.Element>()
+                
+                // Check if the clicked element is not part of the event UI
+                val isEventElement = target.classList.contains("event-element") || 
+                                    target.closest(".event-element") != null ||
+                                    target.classList.contains("event-delete-button") ||
+                                    target.closest(".event-delete-button") != null
+                
+                if (!isEventElement) {
+                    editingEvent = null
+                }
+            }
+            
+            kotlinx.browser.document.addEventListener("click", clickListener)
+            
+            // Cleanup function
+            onDispose {
+                kotlinx.browser.document.removeEventListener("click", clickListener)
+            }
+        }
+    }
+
     // For debugging - assign a unique ID to help track this cell
     val cellId = "cell-${date.getFullYear()}-${date.getMonth()}-${date.getDate()}-$hour"
 
@@ -447,7 +474,9 @@ fun CalendarCell(
                                     if (isShiftClick) {
                                         GlobalSelectionState.toggleSelection(event.id, true)
                                     } else {
-                                        // Call the onEventClick callback to open edit dialog
+                                        // Set this event as the editing event to show delete button
+                                        editingEvent = if (editingEvent == event) null else event
+                                        // Also call the onEventClick callback for any additional handling
                                         onEventClick(event)
                                         GlobalSelectionState.toggleSelection(event.id, false)
                                     }
@@ -486,6 +515,17 @@ fun CalendarCell(
                                     property("cursor", if (isDragging) "grabbing" else "grab")
                                     property("user-select", "none")
                                     property("min-height", "24px") // Ensure minimum readable height
+                                    
+                                    // Make event span multiple grid rows based on duration
+                                    val durationInSlots = event.durationInSlots
+                                    if (durationInSlots > 1) {
+                                        property("position", "absolute")
+                                        property("top", "0")
+                                        property("left", "6px")
+                                        property("right", "6px")
+                                        property("height", "${durationInSlots * 40 - 2}px") // 40px per slot minus border
+                                        property("z-index", "5")
+                                    }
                                 }
                                 .position(Position.Relative)
                                 .attrsModifier {
@@ -573,6 +613,9 @@ fun CalendarCell(
                                                 editingEvent = null
                                             }
                                         }
+                                        .attrsModifier {
+                                            classes("event-delete-button")
+                                        }
                                         .styleModifier {
                                             property("transition", "all 0.2s ease")
                                         }
@@ -586,6 +629,42 @@ fun CalendarCell(
                                             .styleModifier {
                                                 property("line-height", "1")
                                                 property("user-select", "none")
+                                            }
+                                    )
+                                }
+                            }
+
+                            // Resize handle at the bottom of the event
+                            if (event.durationInSlots > 1 || isActive) {
+                                Box(
+                                    Modifier
+                                        .align(Alignment.BottomCenter)
+                                        .width(100.percent)
+                                        .height(8.px)
+                                        .backgroundColor(Color.rgba(255, 255, 255, 0.3f))
+                                        .cursor(Cursor.SResize)
+                                        .styleModifier {
+                                            property("border-top", "1px solid rgba(255,255,255,0.5)")
+                                            property("transition", "all 0.2s ease")
+                                        }
+                                        .onMouseEnter {
+                                            // Add visual feedback for resize handle
+                                        }
+                                        .attrsModifier {
+                                            classes("event-resize-handle")
+                                            attr("data-event-id", event.id)
+                                        }
+                                ) {
+                                    // Small resize indicator
+                                    Box(
+                                        Modifier
+                                            .align(Alignment.Center)
+                                            .width(20.px)
+                                            .height(3.px)
+                                            .backgroundColor(Colors.White)
+                                            .borderRadius(2.px)
+                                            .styleModifier {
+                                                property("opacity", "0.7")
                                             }
                                     )
                                 }

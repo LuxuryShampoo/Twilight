@@ -94,6 +94,21 @@ data class CalendarEvent(
         get() = startTime.getHours()
 
     /**
+     * Computed property to get the duration in hours
+     */
+    val durationInHours: Double
+        get() {
+            val diffInMs = endTime.getTime() - startTime.getTime()
+            return diffInMs / (1000 * 60 * 60) // Convert milliseconds to hours
+        }
+
+    /**
+     * Computed property to get the duration in 30-minute slots
+     */
+    val durationInSlots: Int
+        get() = (durationInHours * 2).toInt().coerceAtLeast(1) // At least 1 slot (30 minutes)
+
+    /**
      * Creates a copy of the event with the specified hour
      */
     fun copy(hour: Int): CalendarEvent {
