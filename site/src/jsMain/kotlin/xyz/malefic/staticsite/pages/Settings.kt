@@ -299,7 +299,18 @@ fun SettingsPage() {
                                 themes.forEachIndexed { index, theme ->
                                     Div(
                                         attrs = {
-                                            onClick { selectedThemeIndex = index }
+                                            onClick { 
+                                                selectedThemeIndex = index
+                                                // Apply theme immediately
+                                                val themeObj = js("{}")
+                                                themeObj["name"] = theme.name
+                                                themeObj["primaryColor"] = theme.primaryColor
+                                                themeObj["secondaryColor"] = theme.secondaryColor
+                                                themeObj["backgroundColor"] = theme.backgroundColor
+                                                localStorage.setItem("calendarTheme", JSON.stringify(themeObj))
+                                                // Force refresh to apply theme
+                                                window.location.reload()
+                                            }
                                             style {
                                                 border(
                                                     2.px,

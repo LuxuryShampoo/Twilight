@@ -327,6 +327,33 @@ fun CalendarCell(
     // Drop highlight state
     var isDropTarget by remember { mutableStateOf(false) }
 
+    // Click-outside listener to clear editing state
+    LaunchedEffect(editingEvent) {
+        if (editingEvent != null) {
+            val clickListener: (dynamic) -> Unit = { event ->
+                val clickEvent = event.unsafeCast<org.w3c.dom.events.MouseEvent>()
+                val target = clickEvent.target.unsafeCast<org.w3c.dom.Element>()
+                
+                // Check if the clicked element is not part of the event UI
+                val isEventElement = target.classList.contains("event-element") || 
+                                    target.closest(".event-element") != null ||
+                                    target.classList.contains("event-delete-button") ||
+                                    target.closest(".event-delete-button") != null
+                
+                if (!isEventElement) {
+                    editingEvent = null
+                }
+            }
+            
+            kotlinx.browser.document.addEventListener("click", clickListener)
+            
+            // Cleanup function
+            onDispose {
+                kotlinx.browser.document.removeEventListener("click", clickListener)
+            }
+        }
+    }
+
     // For debugging - assign a unique ID to help track this cell
     val cellId = "cell-${date.getFullYear()}-${date.getMonth()}-${date.getDate()}-$hour"
 
@@ -447,7 +474,9 @@ fun CalendarCell(
                                     if (isShiftClick) {
                                         GlobalSelectionState.toggleSelection(event.id, true)
                                     } else {
-                                        // Call the onEventClick callback to open edit dialog
+                                        // Set this event as the editing event to show delete button
+                                        editingEvent = if (editingEvent == event) null else event
+                                        // Also call the onEventClick callback for any additional handling
                                         onEventClick(event)
                                         GlobalSelectionState.toggleSelection(event.id, false)
                                     }
@@ -572,6 +601,9 @@ fun CalendarCell(
                                                 onEventDelete(event)
                                                 editingEvent = null
                                             }
+                                        }
+                                        .attrsModifier {
+                                            classes("event-delete-button")
                                         }
                                         .styleModifier {
                                             property("transition", "all 0.2s ease")
