@@ -440,6 +440,10 @@ fun autoSortTasks(tasks: List<WeeklyTask>): List<CalendarEvent> {
     val now = Date()
     val events = mutableListOf<CalendarEvent>()
     
+    // Calculate Monday of the current week (same logic as createDefaultWeeklySchedule)
+    val currentDayOfWeek = (now.getDay() + 6) % 7 // Convert Sunday=0 to Monday=0 system
+    val mondayDate = Date(now.getFullYear(), now.getMonth(), now.getDate() - currentDayOfWeek)
+    
     // Separate END tasks from regular tasks
     val completedTasks = tasks.filter { !it.isCompleted }
     val endTasks = completedTasks.filter { it.priority == TaskPriority.END }
@@ -448,22 +452,18 @@ fun autoSortTasks(tasks: List<WeeklyTask>): List<CalendarEvent> {
             .thenBy { it.estimatedHours })
     
     var currentHour = 9.0 // Start at 9 AM
-    var currentDay = 0
+    var currentDay = 0 // Monday = 0, Tuesday = 1, etc.
     val workDayEnd = 17.0 // End at 5 PM
     
     // Schedule regular tasks first
     regularTasks.forEach { task ->
-        // Skip weekends (simple implementation)
-        if (currentDay >= 5) {
-            currentDay = 0
-            currentHour = 9.0
-        }
-        
         // Check if task fits in current day
         if (currentHour + task.estimatedHours > workDayEnd) {
+            // Move to next day
             currentDay++
             currentHour = 9.0
-            // Skip weekends again
+            
+            // Skip weekends (reset to Monday if we go past Friday)
             if (currentDay >= 5) {
                 currentDay = 0
             }
@@ -477,16 +477,16 @@ fun autoSortTasks(tasks: List<WeeklyTask>): List<CalendarEvent> {
         val endMinute = ((endTime % 1) * 60).toInt()
         
         val startTime = Date(
-            now.getFullYear(),
-            now.getMonth(),
-            now.getDate() + currentDay,
+            mondayDate.getFullYear(),
+            mondayDate.getMonth(),
+            mondayDate.getDate() + currentDay,
             startHour,
             startMinute
         )
         val endTimeDate = Date(
-            now.getFullYear(),
-            now.getMonth(),
-            now.getDate() + currentDay,
+            mondayDate.getFullYear(),
+            mondayDate.getMonth(),
+            mondayDate.getDate() + currentDay,
             endHour,
             endMinute
         )
@@ -527,16 +527,16 @@ fun autoSortTasks(tasks: List<WeeklyTask>): List<CalendarEvent> {
             
             if (dayStartHour < workDayEnd) {
                 val startTime = Date(
-                    now.getFullYear(),
-                    now.getMonth(),
-                    now.getDate() + day,
+                    mondayDate.getFullYear(),
+                    mondayDate.getMonth(),
+                    mondayDate.getDate() + day,
                     dayStartHour.toInt(),
                     ((dayStartHour % 1) * 60).toInt()
                 )
                 val endTime = Date(
-                    now.getFullYear(),
-                    now.getMonth(),
-                    now.getDate() + day,
+                    mondayDate.getFullYear(),
+                    mondayDate.getMonth(),
+                    mondayDate.getDate() + day,
                     workDayEnd.toInt(),
                     0
                 )
