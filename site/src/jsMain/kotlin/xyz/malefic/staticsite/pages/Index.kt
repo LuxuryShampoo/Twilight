@@ -19,12 +19,10 @@ import xyz.malefic.staticsite.components.calendar.GlobalSelectionState
 import xyz.malefic.staticsite.components.WeeklyTaskManager
 import xyz.malefic.staticsite.components.WeeklyTask
 import xyz.malefic.staticsite.components.TaskPriority
-import xyz.malefic.staticsite.components.EnhancedEventDialog
 import xyz.malefic.staticsite.util.CalendarEvent
 import xyz.malefic.staticsite.util.CalendarUtils
 import xyz.malefic.staticsite.util.EventMode
 import xyz.malefic.staticsite.util.RecurrenceFrequency
-import xyz.malefic.staticsite.util.SmartScheduler
 import xyz.malefic.staticsite.util.ThemeManager
 import kotlin.js.Date
 
@@ -169,9 +167,6 @@ fun HomePage() {
     // State for weekly tasks
     val tasks = remember { mutableStateListOf<WeeklyTask>() }
 
-    // State for unscheduled tasks (task buffer)
-    val unscheduledTasks = remember { mutableStateListOf<CalendarEvent>() }
-
     // Undo/Redo state management
     val deletedEvents = remember { mutableStateListOf<CalendarEvent>() }
     
@@ -231,7 +226,6 @@ fun HomePage() {
 
     // State for event creation dialog
     var showEventDialog by remember { mutableStateOf(false) }
-    var showEnhancedEventDialog by remember { mutableStateOf(false) }
     var newEventTitle by remember { mutableStateOf("") }
     var newEventDescription by remember { mutableStateOf("") }
     var newEventStartTime by remember { mutableStateOf<Date?>(null) }
@@ -802,53 +796,6 @@ fun HomePage() {
                             },
                         ) {
                             Text("+ Add Event")
-                        }
-                        
-                        Button(
-                            attrs = {
-                                onClick { showEnhancedEventDialog = true }
-                                style {
-                                    padding(12.px, 24.px)
-                                    backgroundColor(Color("#10b981"))
-                                    color(Colors.White)
-                                    border(0.px)
-                                    borderRadius(4.px)
-                                    cursor(Cursor.Pointer)
-                                    fontSize(16.px)
-                                    fontWeight(500)
-                                    marginRight(12.px)
-                                }
-                            },
-                        ) {
-                            Text("⚡ Quick Add Task")
-                        }
-                        
-                        // Smart Schedule button
-                        if (unscheduledTasks.isNotEmpty()) {
-                            Button(
-                                attrs = {
-                                    onClick {
-                                        val scheduledEvents = SmartScheduler.scheduleTasksIntoFreeBlocks(
-                                            unscheduledTasks.toList(),
-                                            events.toList()
-                                        )
-                                        events.addAll(scheduledEvents)
-                                        unscheduledTasks.clear()
-                                    }
-                                    style {
-                                        padding(12.px, 24.px)
-                                        backgroundColor(Color("#8b5cf6"))
-                                        color(Colors.White)
-                                        border(0.px)
-                                        borderRadius(4.px)
-                                        cursor(Cursor.Pointer)
-                                        fontSize(16.px)
-                                        fontWeight(500)
-                                    }
-                                },
-                            ) {
-                                Text("🧠 Smart Schedule (${unscheduledTasks.size})")
-                            }
                         }
                     }
 
@@ -1841,129 +1788,5 @@ fun HomePage() {
                 tasks.clear()
             }
         )
-
-        // Unscheduled Tasks Display
-        if (unscheduledTasks.isNotEmpty()) {
-            Box(
-                Modifier
-                    .fillMaxWidth()
-                    .padding(top = 24.px)
-                    .backgroundColor(Color(ThemeManager.Colors.calendarBackground))
-                    .border(1.px, LineStyle.Solid, Color(ThemeManager.Colors.border))
-                    .borderRadius(8.px)
-                    .padding(16.px)
-            ) {
-                Column {
-                    Row(
-                        Modifier.fillMaxWidth().margin(bottom = 16.px),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        SpanText(
-                            "Unscheduled Tasks (${unscheduledTasks.size})",
-                            Modifier
-                                .fontSize(18.px)
-                                .fontWeight(600)
-                                .color(Color(ThemeManager.Colors.text))
-                        )
-                        
-                        Spacer()
-                        
-                        Button(
-                            attrs = {
-                                onClick {
-                                    val scheduledEvents = SmartScheduler.scheduleTasksIntoFreeBlocks(
-                                        unscheduledTasks.toList(),
-                                        events.toList()
-                                    )
-                                    events.addAll(scheduledEvents)
-                                    unscheduledTasks.clear()
-                                }
-                                style {
-                                    padding(8.px, 16.px)
-                                    backgroundColor(Color("#8b5cf6"))
-                                    color(Colors.White)
-                                    border(0.px)
-                                    borderRadius(4.px)
-                                    cursor(Cursor.Pointer)
-                                    fontSize(14.px)
-                                }
-                            }
-                        ) {
-                            SpanText("🧠 Auto-Schedule All")
-                        }
-                    }
-                    
-                    unscheduledTasks.forEach { task ->
-                        Box(
-                            Modifier
-                                .fillMaxWidth()
-                                .padding(bottom = 8.px)
-                                .backgroundColor(Color(task.color ?: "#6b7280"))
-                                .borderRadius(4.px)
-                                .padding(12.px)
-                        ) {
-                            Row(
-                                Modifier.fillMaxWidth(),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Column(Modifier.weight(1f)) {
-                                    SpanText(
-                                        task.title,
-                                        Modifier
-                                            .fontSize(14.px)
-                                            .fontWeight(600)
-                                            .color(Colors.White)
-                                            .margin(bottom = 4.px)
-                                    )
-                                    
-                                    val timeInfo = if (task.numQuestions != null && task.timePerQuestion != null) {
-                                        val timePerQ = task.timePerQuestion!!
-                                        "${task.numQuestions} questions × ${timePerQ.toInt()} min/q = ${task.calculatedTimeInHours?.let { (it * 100).toInt() / 100.0 } ?: 0}h"
-                                    } else {
-                                        "${task.durationInHours}h"
-                                    }
-                                    
-                                    SpanText(
-                                        "${task.taskType?.name?.replace('_', ' ') ?: "TASK"} • $timeInfo • ${task.urgencyLevel?.name ?: "MEDIUM"}",
-                                        Modifier
-                                            .fontSize(12.px)
-                                            .color(Colors.White)
-                                            .opacity(90)
-                                    )
-                                }
-                                
-                                Button(
-                                    attrs = {
-                                        onClick { unscheduledTasks.remove(task) }
-                                        style {
-                                            padding(4.px, 8.px)
-                                            backgroundColor(Colors.White)
-                                            color(Color("#dc2626"))
-                                            border(0.px)
-                                            borderRadius(4.px)
-                                            cursor(Cursor.Pointer)
-                                            fontSize(12.px)
-                                        }
-                                    }
-                                ) {
-                                    SpanText("×")
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        // Enhanced Event Dialog
-        if (showEnhancedEventDialog) {
-            EnhancedEventDialog(
-                onDismiss = { showEnhancedEventDialog = false },
-                onCreate = { event ->
-                    unscheduledTasks.add(event)
-                    showEnhancedEventDialog = false
-                }
-            )
-        }
     }
 }

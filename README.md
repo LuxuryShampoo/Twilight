@@ -1,32 +1,10 @@
-# Twilight Calendar
+This is a [Kobweb](https://github.com/varabyte/kobweb) project bootstrapped with the `app/empty` template.
 
-A smart calendar application built with [Kobweb](https://github.com/varabyte/kobweb) that helps you manage your time efficiently with intelligent task scheduling.
+This template is useful if you already know what you're doing and just want a clean slate. By default, it
+just creates a blank home page (which prints to the console so you can confirm it's working)
 
-## Features
-
-### ⚡ Quick Add Task
-Simplified task creation with:
-- **Task Types**: Assignment, Homework, Project, SAT Study, Exam Prep, Reading, Practice
-- **Flexible Time Input**: Question-based (# questions × time per question) or manual hours
-- **Urgency Levels**: Low, Medium, High, Critical with color coding
-- **Smart Auto-Scheduling**: Automatically organizes tasks into available FREE time blocks
-
-### 🧠 Smart Scheduling Algorithm
-- Detects available FREE time blocks in your schedule
-- Prioritizes tasks by urgency level
-- Breaks projects into manageable work sessions (max 2 hours)
-- Optimizes SAT study sessions (75-minute blocks)
-- Schedules one-off assignments in single sittings
-
-### 📅 Calendar Features
-- Weekly view with 30-minute time slots
-- Drag-and-drop event rescheduling
-- Event color coding by urgency
-- Dark mode support
-- Recurring events
-- Event editing and deletion
-
-For detailed feature documentation, see [ENHANCED_FEATURES.md](./ENHANCED_FEATURES.md)
+If you are still learning, consider instantiating the `app` template (or one of the examples) to see actual,
+working projects.
 
 ## Getting Started
 
@@ -48,22 +26,6 @@ Press `Q` in the terminal to gracefully stop the server.
 
 Feel free to edit / add / delete new components, pages, and API endpoints! When you make any changes, the site will
 indicate the status of the build and automatically reload when ready.
-
-## Usage Example
-
-1. Open the application
-2. Click "⚡ Quick Add Task"
-3. Enter your task details:
-   - Task name: "Math homework"
-   - Type: Assignment
-   - Questions: 20
-   - Time per question: 3 minutes
-   - Urgency: High
-4. Click "Create Task"
-5. Task appears in "Unscheduled Tasks" buffer
-6. Click "🧠 Smart Schedule" to automatically place it in your calendar
-
-The algorithm will find the best available FREE time block based on task urgency and type!
 
 ## Exporting the Project
 
@@ -89,14 +51,3 @@ kobweb run --env prod --notty
 Kobweb also supports exporting to a static layout which is compatible with static hosting providers, such as GitHub
 Pages, Netlify, Firebase, any presumably all the others. You can read more about that approach here:
 https://bitspittle.dev/blog/2022/staticdeploy
-
-## Technology Stack
-
-- **Framework**: Kobweb (Kotlin/JS + Compose for Web)
-- **Language**: Kotlin
-- **UI**: Compose for Web
-- **Build System**: Gradle
-
-## Contributing
-
-This is a student scheduling application designed to help manage time effectively across different types of tasks and commitments.
