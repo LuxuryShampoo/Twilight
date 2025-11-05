@@ -20,12 +20,12 @@ object DateParser {
                 getStartOfDay(referenceDate)
             }
             normalized == "tomorrow" -> {
-                addDaysPrivate(getStartOfDay(referenceDate), 1)
+                addDays(getStartOfDay(referenceDate), 1)
             }
             normalized.startsWith("in ") && normalized.contains("day") -> {
                 val parts = normalized.split(" ")
                 val days = parts.getOrNull(1)?.toIntOrNull() ?: return null
-                addDaysPrivate(getStartOfDay(referenceDate), days)
+                addDays(getStartOfDay(referenceDate), days)
             }
             normalized == "monday" || normalized == "next monday" -> {
                 getNextDayOfWeek(referenceDate, 1, normalized.contains("next"))
@@ -74,13 +74,6 @@ object DateParser {
     }
     
     /**
-     * Add days to a date (private version for internal use)
-     */
-    private fun addDaysPrivate(date: Date, days: Int): Date {
-        return Date(date.getTime() + days * 24 * 60 * 60 * 1000)
-    }
-    
-    /**
      * Get the next occurrence of a day of week
      * @param referenceDate the reference date
      * @param targetDay 0=Sunday, 1=Monday, ..., 6=Saturday
@@ -94,7 +87,7 @@ object DateParser {
             daysToAdd += 7
         }
         
-        return addDaysPrivate(getStartOfDay(referenceDate), daysToAdd)
+        return addDays(getStartOfDay(referenceDate), daysToAdd)
     }
     
     /**

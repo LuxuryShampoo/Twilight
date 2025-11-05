@@ -40,7 +40,7 @@ object TaskParser {
             }
             
             return Task(
-                id = "task-${Date.now().toLong()}",
+                id = "task-${Date.now().toLong()}-${kotlin.random.Random.nextInt(1000, 9999)}",
                 name = name,
                 taskType = taskType,
                 urgencyLevel = urgency ?: UrgencyLevel.MEDIUM,

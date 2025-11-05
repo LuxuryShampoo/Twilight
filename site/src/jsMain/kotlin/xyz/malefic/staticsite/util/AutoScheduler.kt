@@ -183,7 +183,7 @@ object AutoScheduler {
     ): ScheduledSession {
         val endTime = Date(startTime.getTime() + durationMinutes * 60 * 1000)
         return ScheduledSession(
-            id = "session-${Date.now().toLong()}-${kotlin.random.Random.nextInt()}",
+            id = "session-${Date.now().toLong()}-${kotlin.random.Random.nextInt(1000, 9999)}",
             taskId = task.id,
             startTime = startTime,
             endTime = endTime,

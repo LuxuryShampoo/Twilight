@@ -507,5 +507,24 @@ private fun getCurrentWeekStart(): Date {
 }
 
 private fun Double.format(decimals: Int): String {
-    return this.asDynamic().toFixed(decimals) as String
+    // Use a simple rounding approach without dynamic
+    val factor = when (decimals) {
+        0 -> 1.0
+        1 -> 10.0
+        2 -> 100.0
+        3 -> 1000.0
+        else -> 1.0
+    }
+    val rounded = kotlin.math.round(this * factor) / factor
+    
+    // Format to string with fixed decimals
+    val intPart = rounded.toInt()
+    val decPart = ((rounded - intPart) * factor).toInt()
+    
+    return if (decimals == 0) {
+        intPart.toString()
+    } else {
+        val decStr = decPart.toString().padStart(decimals, '0')
+        "$intPart.$decStr"
+    }
 }
