@@ -28,6 +28,30 @@ enum class RecurrenceFrequency {
 }
 
 /**
+ * Represents the type of task/event.
+ */
+enum class TaskType {
+    PROJECT,        // Multi-session project that should be broken into multiple work sessions
+    ASSIGNMENT,     // One-off assignment that can be completed in one sitting
+    SAT_STUDY,      // SAT studying that needs to be time-managed wisely
+    HOMEWORK,       // Regular homework
+    EXAM_PREP,      // Exam preparation
+    READING,        // Reading assignments
+    PRACTICE,       // Practice problems/exercises
+    OTHER           // Other types
+}
+
+/**
+ * Represents the urgency level of a task.
+ */
+enum class UrgencyLevel {
+    LOW,
+    MEDIUM,
+    HIGH,
+    CRITICAL
+}
+
+/**
  * Represents a theme for a calendar.
  * @property name The name of the theme
  * @property primaryColor The primary color of the theme
@@ -73,7 +97,12 @@ data class CalendarEvent(
     var recurrenceEndDate: Date? = null,
     var color: String? = null,
     var isHoliday: Boolean = false,
-    var isCustom: Boolean = false
+    var isCustom: Boolean = false,
+    // New fields for enhanced task management
+    var taskType: TaskType? = null,
+    var numQuestions: Int? = null,
+    var timePerQuestion: Double? = null, // in minutes
+    var urgencyLevel: UrgencyLevel? = null
 ) {
     /**
      * Computed property to check if the event is passive
@@ -107,6 +136,28 @@ data class CalendarEvent(
      */
     val durationInSlots: Int
         get() = (durationInHours * 2).toInt().coerceAtLeast(1) // At least 1 slot (30 minutes)
+
+    /**
+     * Calculate required time based on number of questions and time per question
+     */
+    val calculatedTimeInMinutes: Double?
+        get() = numQuestions?.let { questions ->
+            timePerQuestion?.let { time ->
+                questions * time
+            }
+        }
+
+    /**
+     * Calculate required time in hours
+     */
+    val calculatedTimeInHours: Double?
+        get() = calculatedTimeInMinutes?.let { it / 60.0 }
+
+    /**
+     * Check if this is a FREE block that can be used for scheduling
+     */
+    val isFreeBlock: Boolean
+        get() = title.contains("FREE", ignoreCase = true)
 
     /**
      * Creates a copy of the event with the specified hour
