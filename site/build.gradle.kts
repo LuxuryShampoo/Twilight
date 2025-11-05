@@ -26,5 +26,9 @@ kotlin {
             implementation(libs.bundles.kobweb)
             implementation(libs.bundles.silk.icons)
         }
+        
+        jsTest.dependencies {
+            implementation(kotlin("test"))
+        }
     }
 }
