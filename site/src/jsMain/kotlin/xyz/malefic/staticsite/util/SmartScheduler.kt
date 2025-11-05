@@ -7,6 +7,9 @@ import kotlin.js.Date
  */
 object SmartScheduler {
     
+    // Minimum remaining time in a block to keep it (15 minutes in milliseconds)
+    private const val MIN_BLOCK_TIME_MS = 15 * 60 * 1000L
+    
     /**
      * Finds all FREE time blocks in the calendar
      */
@@ -25,8 +28,9 @@ object SmartScheduler {
         val scheduledTasks = mutableListOf<CalendarEvent>()
         
         // Sort tasks by urgency (CRITICAL > HIGH > MEDIUM > LOW) and then by calculated time
+        // Note: We negate the ordinal to get descending order since CRITICAL has the highest ordinal
         val sortedTasks = tasks.sortedWith(
-            compareByDescending<CalendarEvent> { it.urgencyLevel?.ordinal ?: 0 }
+            compareBy<CalendarEvent> { -(it.urgencyLevel?.ordinal ?: 0) }
                 .thenBy { it.calculatedTimeInHours ?: it.durationInHours }
         )
         
@@ -102,7 +106,9 @@ object SmartScheduler {
         freeBlocks: MutableList<CalendarEvent>,
         scheduledTasks: MutableList<CalendarEvent>
     ) {
-        val optimalSessionHours = 1.25 // 75 minutes is a good SAT study session
+        // 1.25 hours = 75 minutes, optimal for maintaining focus during SAT study sessions
+        // Based on research showing diminishing returns after 75-90 minutes of concentrated study
+        val optimalSessionHours = 1.25
         var remainingHours = totalHours
         var sessionNumber = 1
         
@@ -199,7 +205,7 @@ object SmartScheduler {
         
         // If there's remaining time in the block, add it back
         val remainingTime = block.endTime.getTime() - scheduled.endTime.getTime()
-        if (remainingTime > 15 * 60 * 1000) { // At least 15 minutes remaining
+        if (remainingTime > MIN_BLOCK_TIME_MS) {
             val newBlock = block.copy(
                 id = CalendarUtils.createEventId(),
                 startTime = scheduled.endTime

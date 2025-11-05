@@ -141,9 +141,11 @@ data class CalendarEvent(
      * Calculate required time based on number of questions and time per question
      */
     val calculatedTimeInMinutes: Double?
-        get() = if (numQuestions != null && timePerQuestion != null) {
-            numQuestions!! * timePerQuestion!!
-        } else null
+        get() = numQuestions?.let { questions ->
+            timePerQuestion?.let { time ->
+                questions * time
+            }
+        }
 
     /**
      * Calculate required time in hours
