@@ -14,71 +14,145 @@ import com.varabyte.kobweb.core.Page
 import com.varabyte.kobweb.silk.components.text.SpanText
 import org.jetbrains.compose.web.css.*
 import org.jetbrains.compose.web.dom.TextArea
-import xyz.malefic.staticsite.util.CalendarEvent
-import xyz.malefic.staticsite.util.EventMode
+import xyz.malefic.staticsite.model.*
+import xyz.malefic.staticsite.util.*
 import kotlin.js.Date
 
 @Page
 @Composable
 fun HomePage() {
-    var events by remember { mutableStateOf(listOf<CalendarEvent>()) }
+    var tasks by remember { mutableStateOf(listOf<Task>()) }
+    var schedule by remember { mutableStateOf(ScheduleParser.parseDefaultSchedule()) }
+    var currentWeekStart by remember { mutableStateOf(getCurrentWeekStart()) }
     var command by remember { mutableStateOf("") }
     val output = remember { mutableStateListOf<String>() }
 
+    // Auto-schedule tasks when they change
+    LaunchedEffect(tasks, schedule) {
+        if (tasks.isNotEmpty()) {
+            AutoScheduler.scheduleTasks(tasks.toList(), schedule, currentWeekStart)
+        }
+    }
+
     fun executeCommand(cmd: String) {
         output.add("> $cmd")
-        val parts = cmd.split(" ")
+        val trimmedCmd = cmd.trim()
+        
+        // Check if this is a natural language task input (contains " - ")
+        if (trimmedCmd.contains(" - ") && !trimmedCmd.startsWith("task ")) {
+            val task = TaskParser.parseTask(trimmedCmd)
+            if (task != null) {
+                tasks = tasks + task
+                output.add("✓ Task added: ${task.name}")
+                output.add("  Type: ${task.taskType.name.replace("_", " ")}")
+                output.add("  Urgency: ${task.urgencyLevel.name}")
+                output.add("  Duration: ${task.calculateTotalMinutes()} min")
+                output.add("  Due: ${formatDateSimple(task.dueDate)}")
+            } else {
+                output.add("✗ Failed to parse task. Use format:")
+                output.add("  <name> - <details>, due <date>, <urgency>")
+                output.add("  Example: Math HW - 50 questions, 1 min each, due Friday, HIGH")
+            }
+            command = ""
+            return
+        }
+        
+        val parts = trimmedCmd.split(" ")
         when (parts.getOrNull(0)) {
             "help" -> {
-                output.add("Available commands:")
-                output.add("  ls - list all events")
-                output.add("  add <title> <yyyy-mm-ddThh:mm> <yyyy-mm-ddThh:mm> [description] - add a new event")
-                output.add("  rm <id> - remove an event by id")
-                output.add("  clear - clear the output")
-                output.add("  help - show this help message")
+                output.add("TASK SCHEDULER COMMANDS:")
+                output.add("  <task description> - Add task using natural language")
+                output.add("    Example: Math HW - 50 questions, 1 min each, due Friday, HIGH")
+                output.add("  tasks - List all tasks")
+                output.add("  schedule - Show auto-generated schedule")
+                output.add("  stats - Show scheduling statistics")
+                output.add("  rm <task-id> - Remove a task")
+                output.add("  clear - Clear the output")
+                output.add("  help - Show this help message")
             }
-            "ls" -> {
-                if (events.isEmpty()) {
-                    output.add("No events.")
+            "tasks" -> {
+                if (tasks.isEmpty()) {
+                    output.add("No tasks yet.")
                 } else {
-                    output.add("Events:")
-                    events.forEach {
-                        output.add("  - [${it.id}] ${it.title}: ${it.startTime} to ${it.endTime} (${it.description})")
+                    output.add("TASKS (${tasks.size}):")
+                    tasks.forEach { task ->
+                        val shortId = task.id.takeLast(8)
+                        output.add("  [$shortId] ${task.name}")
+                        output.add("    ${task.taskType.name.replace("_", " ")} | ${task.urgencyLevel.name} | ${task.calculateTotalMinutes()}min")
+                        output.add("    Due: ${formatDateSimple(task.dueDate)}")
+                        if (task.scheduledSessions.isNotEmpty()) {
+                            output.add("    Scheduled: ${task.scheduledSessions.size} session(s)")
+                        }
+                        output.add("")
                     }
                 }
             }
-            "add" -> {
-                try {
-                    val title = parts[1]
-                    val startTime = Date(parts[2])
-                    val endTime = Date(parts[3])
-                    val description = parts.drop(4).joinToString(" ")
-                    val newEvent =
-                        CalendarEvent(
-                            id = "evt-${Date.now().toLong()}",
-                            title = title,
-                            startTime = startTime,
-                            endTime = endTime,
-                            description = description,
-                            mode = EventMode.ACTIVE,
-                        )
-                    events = events + newEvent
-                    output.add("Event added with id: ${newEvent.id}")
-                } catch (e: Exception) {
-                    output.add("Error: Invalid command format. Use: add <title> <yyyy-mm-ddThh:mm> <yyyy-mm-ddThh:mm> [description]")
+            "schedule" -> {
+                if (tasks.isEmpty()) {
+                    output.add("No tasks to schedule.")
+                } else {
+                    output.add("AUTO-GENERATED SCHEDULE:")
+                    output.add("")
+                    
+                    // Group sessions by day
+                    val sessionsByDay = mutableMapOf<Int, MutableList<Pair<Task, ScheduledSession>>>()
+                    tasks.forEach { task ->
+                        task.scheduledSessions.forEach { session ->
+                            val day = session.startTime.getDay()
+                            sessionsByDay.getOrPut(day) { mutableListOf() }.add(Pair(task, session))
+                        }
+                    }
+                    
+                    if (sessionsByDay.isEmpty()) {
+                        output.add("  No sessions scheduled yet.")
+                        output.add("  (Tasks may not fit in available free blocks)")
+                    } else {
+                        val days = listOf("Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat")
+                        val sortedDays = sessionsByDay.keys.sorted()
+                        sortedDays.forEach { day ->
+                            val sessions = sessionsByDay[day] ?: return@forEach
+                            output.add("${days[day]}:")
+                            sessions.sortedBy { it.second.startTime.getTime() }.forEach { pair ->
+                                val task = pair.first
+                                val session = pair.second
+                                val timeStr = formatTime(session.startTime) + " - " + formatTime(session.endTime)
+                                output.add("  $timeStr | ${task.name} (${session.durationMinutes}min)")
+                            }
+                            output.add("")
+                        }
+                    }
+                }
+            }
+            "stats" -> {
+                if (tasks.isEmpty()) {
+                    output.add("No tasks to analyze.")
+                } else {
+                    val stats = AutoScheduler.calculateStatistics(tasks, schedule)
+                    output.add("SCHEDULING STATISTICS:")
+                    output.add("  Total Free Time: ${formatHours(stats.totalFreeHours)} hrs")
+                    output.add("  Scheduled Time: ${formatHours(stats.scheduledHours)} hrs")
+                    output.add("  Remaining Free: ${formatHours(stats.remainingFreeHours)} hrs")
+                    output.add("  Utilization: ${formatPercent(stats.utilizationPercent)}%")
+                    output.add("  Tasks Scheduled: ${stats.tasksScheduled}")
+                    output.add("  Tasks Unscheduled: ${stats.tasksUnscheduled}")
                 }
             }
             "rm" -> {
                 val id = parts.getOrNull(1)
                 if (id == null) {
-                    output.add("Error: Missing event id. Use: rm <id>")
+                    output.add("✗ Missing task ID. Use: rm <task-id>")
                 } else {
-                    val eventExists = events.any { it.id == id }
-                    if (eventExists) {
-                        events = events.filterNot { it.id == id }
-                        output.add("Event with id '$id' removed.")
+                    val matchingTasks = tasks.filter { it.id.endsWith(id) }
+                    if (matchingTasks.isEmpty()) {
+                        output.add("✗ Task with id '$id' not found.")
+                    } else if (matchingTasks.size > 1) {
+                        output.add("✗ Multiple tasks match '$id'. Please use a longer ID.")
+                        matchingTasks.forEach { task ->
+                            output.add("  ${task.id.takeLast(8)}: ${task.name}")
+                        }
                     } else {
-                        output.add("Error: Event with id '$id' not found.")
+                        tasks = tasks.filterNot { it.id == matchingTasks[0].id }
+                        output.add("✓ Task removed.")
                     }
                 }
             }
@@ -86,15 +160,22 @@ fun HomePage() {
                 output.clear()
             }
             else -> {
-                output.add("Unknown command: '${parts[0]}'. Type 'help' for a list of commands.")
+                output.add("✗ Unknown command: '${parts[0]}'")
+                output.add("  Type 'help' for available commands")
+                output.add("  Or add a task: <name> - <details>, due <date>, <urgency>")
             }
         }
         command = ""
     }
 
     LaunchedEffect(Unit) {
-        output.add("Welcome to Twilight Terminal.")
-        output.add("Type 'help' to see available commands.")
+        output.add("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+        output.add("  TWILIGHT - Intelligent Task Scheduler")
+        output.add("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+        output.add("")
+        output.add("Type 'help' for commands or add a task directly:")
+        output.add("  Example: Study Physics - 2 hours, due Monday, HIGH")
+        output.add("")
     }
 
     Box(
@@ -147,4 +228,35 @@ fun HomePage() {
             }
         }
     }
+}
+
+private fun getCurrentWeekStart(): Date {
+    val now = Date()
+    val dayOfWeek = now.getDay() // 0 = Sunday
+    val daysToSubtract = dayOfWeek
+    return Date(now.getTime() - daysToSubtract * 24 * 60 * 60 * 1000)
+}
+
+private fun formatDateSimple(date: Date): String {
+    val days = listOf("Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat")
+    val months = listOf("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec")
+    return "${days[date.getDay()]} ${months[date.getMonth()]} ${date.getDate()}"
+}
+
+private fun formatTime(date: Date): String {
+    val hour = date.getHours()
+    val minute = date.getMinutes()
+    val ampm = if (hour >= 12) "PM" else "AM"
+    val displayHour = if (hour == 0) 12 else if (hour > 12) hour - 12 else hour
+    val displayMinute = minute.toString().padStart(2, '0')
+    return "$displayHour:$displayMinute$ampm"
+}
+
+private fun formatHours(hours: Double): String {
+    val rounded = kotlin.math.round(hours * 10) / 10
+    return rounded.toString()
+}
+
+private fun formatPercent(percent: Double): String {
+    return kotlin.math.round(percent).toInt().toString()
 }
