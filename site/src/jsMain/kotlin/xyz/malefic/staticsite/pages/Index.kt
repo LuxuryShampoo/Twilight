@@ -142,12 +142,17 @@ fun HomePage() {
                 if (id == null) {
                     output.add("✗ Missing task ID. Use: rm <task-id>")
                 } else {
-                    val taskExists = tasks.any { it.id.endsWith(id) }
-                    if (taskExists) {
-                        tasks = tasks.filterNot { it.id.endsWith(id) }
-                        output.add("✓ Task removed.")
-                    } else {
+                    val matchingTasks = tasks.filter { it.id.endsWith(id) }
+                    if (matchingTasks.isEmpty()) {
                         output.add("✗ Task with id '$id' not found.")
+                    } else if (matchingTasks.size > 1) {
+                        output.add("✗ Multiple tasks match '$id'. Please use a longer ID.")
+                        matchingTasks.forEach { task ->
+                            output.add("  ${task.id.takeLast(8)}: ${task.name}")
+                        }
+                    } else {
+                        tasks = tasks.filterNot { it.id == matchingTasks[0].id }
+                        output.add("✓ Task removed.")
                     }
                 }
             }
