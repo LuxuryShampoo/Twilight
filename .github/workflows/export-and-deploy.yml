@@ -53,7 +53,7 @@ jobs:
           key: ${{ runner.os }}-playwright-${{ steps.browser-cache-id.outputs.value }}
 
       - name: Fetch kobweb
-        uses: robinraju/release-downloader@v1.12
+        uses: robinraju/release-downloader@v1.13
         with:
           repository: "varabyte/kobweb-cli"
           tag: "v${{ env.KOBWEB_CLI_VERSION }}"
